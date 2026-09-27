@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{% if alvo %}Editar usuário{% else %}Novo usuário{% endif %}{% endblock %}
+{% block content %}
+  <section class="page-header compact">
+    <div>
+      <a class="back-link" href="{{ url_for('usuarios.lista') }}">← Voltar aos usuários</a>
+      <h1>{% if alvo %}Editar usuário{% else %}Novo usuário{% endif %}</h1>
+      <p>As permissões são fixas por perfil e sempre conferidas pelo servidor.</p>
+    </div>
+  </section>
+
+  <section class="form-panel">
+    <form method="post" class="form-grid" novalidate>
+      {{ form.hidden_tag() }}
+      <div class="field">
+        {{ form.nome.label }}
+        {{ form.nome(autocomplete='name', maxlength='120', autofocus=true) }}
+        {% for error in form.nome.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </div>
+      <div class="field">
+        {{ form.usuario.label }}
+        {{ form.usuario(autocomplete='off', autocapitalize='none', spellcheck='false', placeholder='nome.sobrenome') }}
+        <small>Letras minúsculas, números, ponto, hífen ou sublinhado.</small>
+        {% for error in form.usuario.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </div>
+      <div class="field span-2">
+        {{ form.papel.label }}
+        {% if alvo and alvo.id == current_user.id %}
+          <input type="hidden" name="papel" value="{{ alvo.papel }}">
+          <div class="readonly-field">{{ alvo.papel_rotulo }}</div>
+        {% else %}
+          {{ form.papel() }}
+        {% endif %}
+        <small>Proprietário: acesso completo. Administrador: estoque e operadores autorizados. Operador: somente consulta nesta fase.</small>
+        {% for error in form.papel.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </div>
+      <fieldset class="field span-2 checkbox-group">
+        <legend>{{ form.empresas.label.text }}</legend>
+        {{ form.empresas() }}
+        <small>Obrigatório para administradores e operadores. Proprietários acessam todas as empresas.</small>
+        {% for error in form.empresas.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </fieldset>
+      {% if not alvo %}
+        <div class="field">
+          {{ form.senha_temporaria.label }}
+          {{ form.senha_temporaria(autocomplete='new-password', aria_describedby='regras-senha') }}
+          <small id="regras-senha">Mínimo de 12 caracteres, com maiúscula, minúscula, número e símbolo. Não use o nome ou usuário.</small>
+          {% for error in form.senha_temporaria.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+        </div>
+        <div class="field">
+          {{ form.confirmar_senha.label }}
+          {{ form.confirmar_senha(autocomplete='new-password') }}
+          {% for error in form.confirmar_senha.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+        </div>
+      {% endif %}
+      <div class="form-actions span-2">
+        <a class="button button-secondary" href="{{ url_for('usuarios.lista') }}">Cancelar</a>
+        {{ form.submit(class='button button-primary') }}
+      </div>
+    </form>
+  </section>
+{% endblock %}

@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Estoque · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="ops-hero ops-hero-carnes" aria-labelledby="estoque-titulo">
+    <div class="ops-hero-copy">
+      <span class="eyebrow">OPERAÇÃO / ESTOQUE</span>
+      <h1 id="estoque-titulo">Estoque</h1>
+      <p>
+        {% if current_user.papel in ['proprietario', 'administrador'] %}
+          Controle os produtos, acompanhe pendências e encontre rapidamente o que precisa.
+        {% else %}
+          Consulte produtos, preços e saldos da empresa de forma simples e direta.
+        {% endif %}
+      </p>
+    </div>
+  </section>
+
+  <section class="inventory-overview-grid" aria-label="Resumo do estoque">
+    <article class="inventory-overview-card">
+      <span>Total de produtos</span>
+      <strong>{{ indicadores.total }}</strong>
+      <small>cadastros ativos</small>
+    </article>
+    <article class="inventory-overview-card is-success">
+      <span>Aguardando inventário</span>
+      <strong>{{ indicadores.inventario }}</strong>
+      <small>saldo inicial pendente</small>
+    </article>
+    <article class="inventory-overview-card is-warning">
+      <span>Revisão pendente</span>
+      <strong>{{ indicadores.revisao }}</strong>
+      <small>itens para conferir</small>
+    </article>
+    <article class="inventory-overview-card is-danger">
+      <span>Sem código</span>
+      <strong>{{ indicadores.sem_codigo }}</strong>
+      <small>produtos sem código ativo</small>
+    </article>
+  </section>
+
+  <section class="panel inventory-main-panel">
+    <div class="inventory-toolbar-top">
+      <form method="get" class="inventory-search-form">
+        <label class="sr-only" for="q">Buscar produto</label>
+        <div class="inventory-search-wrap">
+          <span aria-hidden="true">⌕</span>
+          <input id="q" name="q" value="{{ busca }}" maxlength="120" placeholder="Buscar produto (código, nome, SKU ou categoria)...">
+        </div>
+        <input type="hidden" name="situacao" value="{{ situacao }}">
+        <button class="button button-secondary" type="submit">Buscar</button>
+      </form>
+
+      <div class="inventory-toolbar-actions">
+        {% if current_user.papel in ['proprietario', 'administrador'] %}
+          <a class="button button-secondary" href="{{ url_for('inventario.lista', empresa_id=empresa.id) }}">Inventário em lote</a>
+          <a class="button button-primary" href="{{ url_for('estoque.novo', empresa_id=empresa.id) }}">+ Novo produto</a>
+        {% else %}
+          <span class="readonly-badge">PERFIL SOMENTE PARA CONSULTA</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="inventory-filter-bar">
+      <span class="inventory-filter-label">Status:</span>
+      <nav class="filter-tabs inventory-filter-tabs" aria-label="Filtrar estoque">
+        <a class="{% if situacao == 'ativos' %}selected{% endif %}" href="{{ url_for('estoque.lista', empresa_id=empresa.id, q=busca, situacao='ativos') }}">Ativos</a>
+        <a class="{% if situacao == 'inventario' %}selected{% endif %}" href="{{ url_for('estoque.lista', empresa_id=empresa.id, q=busca, situacao='inventario') }}">Inventário</a>
+        <a class="{% if situacao == 'revisao' %}selected{% endif %}" href="{{ url_for('estoque.lista', empresa_id=empresa.id, q=busca, situacao='revisao') }}">Revisão</a>
+        <a class="{% if situacao == 'sem_codigo' %}selected{% endif %}" href="{{ url_for('estoque.lista', empresa_id=empresa.id, q=busca, situacao='sem_codigo') }}">Sem código</a>
+        <a class="{% if situacao == 'arquivados' %}selected{% endif %}" href="{{ url_for('estoque.lista', empresa_id=empresa.id, q=busca, situacao='arquivados') }}">Arquivados</a>
+      </nav>
+      <span class="inventory-filter-label inventory-filter-label-categoria">Categorias:</span>
+      {% set categoria_atual = busca|trim|lower %}
+      <nav class="filter-tabs inventory-category-tabs" aria-label="Filtrar por categoria">
+        <a class="{% if not busca %}selected{% endif %}" href="{{ url_for('estoque.lista', empresa_id=empresa.id, situacao=situacao) }}">Todas</a>
+        <a class="{% if categoria_atual == 'bebidas' %}selected{% endif %}" href="{{ url_for('estoque.lista', empresa_id=empresa.id, situacao=situacao, q='bebidas') }}">Bebidas</a>
+        <a class="{% if categoria_atual == 'carnes' %}selected{% endif %}" href="{{ url_for('estoque.lista', empresa_id=empresa.id, situacao=situacao, q='carnes') }}">Carnes</a>
+        <a class="{% if categoria_atual == 'petiscos' %}selected{% endif %}" href="{{ url_for('estoque.lista', empresa_id=empresa.id, situacao=situacao, q='petiscos') }}">Petiscos</a>
+        <a class="{% if categoria_atual == 'chocolates' %}selected{% endif %}" href="{{ url_for('estoque.lista', empresa_id=empresa.id, situacao=situacao, q='chocolates') }}">Chocolates</a>
+        <a class="{% if categoria_atual == 'temperos' %}selected{% endif %}" href="{{ url_for('estoque.lista', empresa_id=empresa.id, situacao=situacao, q='temperos') }}">Temperos</a>
+      </nav>
+    </div>
+
+    <div class="table-scroll inventory-table-wrap">
+      <table class="inventory-table">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Produto</th>
+            <th>Categoria</th>
+            <th class="number">Estoque atual</th>
+            <th>Unidade</th>
+            <th class="number">Preço</th>
+            <th>Status</th>
+            <th class="actions">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for produto in produtos.items %}
+            <tr>
+              <td><span class="code">{{ produto.codigo_externo or produto.sku_interno }}</span></td>
+              <td>
+                <strong>{{ produto.nome }}</strong>
+                <small class="subline">{{ produto.sku_interno }}</small>
+              </td>
+              <td>{{ produto.categoria }}</td>
+              <td class="number"><strong>{{ produto.saldo.quantidade|quantidade }}</strong></td>
+              <td>{{ produto.unidade }}</td>
+              <td class="number">{{ produto.preco_venda|brl }}</td>
+              <td>
+                <div class="badges inventory-badges">
+                  {% if not produto.ativo %}
+                    <span class="badge badge-muted">Arquivado</span>
+                  {% elif produto.saldo.aguardando_inventario %}
+                    <span class="badge badge-warning">Inventário</span>
+                  {% elif produto.revisao_pendente %}
+                    <span class="badge badge-danger" title="{{ produto.motivos_revisao|join(', ') }}">Revisar</span>
+                  {% else %}
+                    <span class="badge badge-success">Regular</span>
+                  {% endif %}
+                </div>
+              </td>
+              <td class="actions inventory-actions">
+                {% if produto.ativo and current_user.papel in ['proprietario', 'administrador'] %}
+                  <a href="{{ url_for('codigos.lista', empresa_id=empresa.id, produto_id=produto.id) }}">Códigos</a>
+                  <a href="{{ url_for('estoque.movimentar', empresa_id=empresa.id, produto_id=produto.id) }}">Movimentar</a>
+                  <a href="{{ url_for('estoque.editar', empresa_id=empresa.id, produto_id=produto.id) }}">Editar</a>
+                  <form method="post" action="{{ url_for('estoque.arquivar', empresa_id=empresa.id, produto_id=produto.id) }}" data-confirm="Arquivar este produto? O histórico será preservado.">
+                    {{ acao_form.hidden_tag() }}
+                    <button type="submit" class="link-danger">Arquivar</button>
+                  </form>
+                {% elif current_user.papel in ['proprietario', 'administrador'] %}
+                  <a href="{{ url_for('codigos.lista', empresa_id=empresa.id, produto_id=produto.id) }}">Códigos</a>
+                  <form method="post" action="{{ url_for('estoque.restaurar', empresa_id=empresa.id, produto_id=produto.id) }}">
+                    {{ acao_form.hidden_tag() }}
+                    <button type="submit">Restaurar</button>
+                  </form>
+                {% else %}
+                  <span class="muted-text">Consulta</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="8" class="empty-state inventory-empty-state">
+                <strong>Nenhum produto encontrado</strong>
+                <small>Revise a busca ou troque o filtro selecionado.</small>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="inventory-table-footer">
+      <span>Mostrando {{ produtos.items|length }} de {{ produtos.total }} produto(s)</span>
+      {% if produtos.pages > 1 %}
+        <nav class="inventory-pagination" aria-label="Paginação">
+          {% if produtos.has_prev %}
+            <a class="inventory-page-nav" href="{{ url_for('estoque.lista', empresa_id=empresa.id, q=busca, situacao=situacao, page=produtos.prev_num) }}">‹</a>
+          {% endif %}
+          {% for page_num in produtos.iter_pages(left_edge=1, left_current=1, right_current=2, right_edge=1) %}
+            {% if page_num %}
+              <a class="inventory-page-link {% if page_num == produtos.page %}is-current{% endif %}" href="{{ url_for('estoque.lista', empresa_id=empresa.id, q=busca, situacao=situacao, page=page_num) }}">{{ page_num }}</a>
+            {% else %}
+              <span class="inventory-page-gap">…</span>
+            {% endif %}
+          {% endfor %}
+          {% if produtos.has_next %}
+            <a class="inventory-page-nav" href="{{ url_for('estoque.lista', empresa_id=empresa.id, q=busca, situacao=situacao, page=produtos.next_num) }}">›</a>
+          {% endif %}
+        </nav>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

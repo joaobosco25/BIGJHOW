@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Inventário em lote · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <div>
+      <span class="eyebrow">OPERAÇÃO / INVENTÁRIO INICIAL</span>
+      <h1>Inventário em lote</h1>
+      <p>Conte vários produtos pela tela ou por uma planilha controlada, sem transformar campos vazios em saldo zero.</p>
+    </div>
+    <a class="button button-secondary" href="{{ url_for('estoque.lista', empresa_id=empresa.id) }}">Voltar ao estoque</a>
+  </section>
+
+  <section class="metric-grid inventario-metricas" aria-label="Resumo do inventário">
+    <article class="metric-card warning">
+      <span>Aguardando contagem</span><strong>{{ aguardando }}</strong><small>produtos ainda sem saldo confirmado</small>
+    </article>
+    <article class="metric-card">
+      <span>Empresa</span><strong class="metric-text">{{ empresa.nome }}</strong><small>o lote nunca mistura empresas</small>
+    </article>
+  </section>
+
+  <section class="panel form-panel inventario-novo">
+    <span class="eyebrow">NOVO RASCUNHO</span>
+    <h2>Iniciar contagem pendente</h2>
+    <p class="panel-description">O rascunho incluirá somente produtos ativos que ainda aguardam o primeiro inventário. Apenas um rascunho pode ficar aberto por empresa.</p>
+    <form method="post" class="form-grid">
+      {{ form.hidden_tag() }}
+      <div class="field span-2">
+        {{ form.descricao.label }}
+        {{ form.descricao(maxlength=160, autocomplete="off") }}
+        {% for error in form.descricao.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </div>
+      <div class="form-actions span-2">
+        {{ form.submit(class="button button-primary", disabled=(aguardando == 0)) }}
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div><span class="eyebrow">HISTÓRICO PRESERVADO</span><h2>Inventários da empresa</h2></div>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Descrição</th><th>Status</th><th class="number">Contados</th><th class="number">Pendentes</th><th>Criado por</th><th>Data</th><th class="actions">Ação</th></tr>
+        </thead>
+        <tbody>
+          {% for registro in historico %}
+            {% set item = registro.inventario %}
+            <tr>
+              <td><strong>{{ item.descricao }}</strong><small class="subline">Lote {{ item.id|string|truncate(13, True, '') }}</small></td>
+              <td><span class="badge {% if item.status == 'finalizado' %}badge-success{% elif item.status == 'cancelado' %}badge-muted{% else %}badge-warning{% endif %}">{{ item.status_rotulo }}</span></td>
+              <td class="number">{{ registro.resumo.contados }}</td>
+              <td class="number">{{ registro.resumo.pendentes }}</td>
+              <td>{{ item.criado_por.nome if item.criado_por else 'Usuário removido' }}</td>
+              <td class="nowrap">{{ item.criado_em|data_hora }}</td>
+              <td class="actions"><a href="{{ url_for('inventario.detalhe', empresa_id=empresa.id, inventario_id=item.id) }}">Abrir</a></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7" class="empty-state">Nenhum inventário em lote foi criado nesta empresa.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% block title %}Caixa · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="pos-hero {% if empresa.nome == 'Big Jhow Carnes' %}pos-hero-carnes{% endif %}">
+    <div class="pos-hero-copy">
+      <h1>Caixa</h1>
+      <p>Leia os produtos, receba o pagamento e entregue o comprovante.</p>
+    </div>
+
+    {% if current_user.papel in ['proprietario', 'administrador'] %}
+      <details class="pos-tools-menu pos-tools-menu-overlay">
+        <summary class="button button-secondary">Menu do caixa <span aria-hidden="true">⌄</span></summary>
+        <nav aria-label="Ações secundárias do caixa">
+          <a href="{{ url_for('operacao.historico', empresa_id=empresa.id) }}"><strong>Histórico de turnos</strong><small>Vendas, pagamentos e movimentos por dia</small></a>
+          {% if turno %}
+            <a href="{{ url_for('operacao.detalhe_turno', empresa_id=empresa.id, turno_id=turno.id) }}"><strong>Movimentar ou fechar turno</strong><small>Sangria, suprimento e conferência</small></a>
+          {% endif %}
+          <a href="{{ url_for('operacao.impressoes', empresa_id=empresa.id) }}"><strong>Fila de impressão</strong><small>Comprovantes pendentes e processados</small></a>
+          <a href="{{ url_for('operacao.autorizacoes', empresa_id=empresa.id) }}"><strong>Autorizações{% if pendentes %} · {{ pendentes }} pendente(s){% endif %}</strong><small>Sangrias e suprimentos solicitados</small></a>
+          <a href="{{ url_for('operacao.configuracao', empresa_id=empresa.id) }}"><strong>Terminais e impressoras</strong><small>Configuração administrativa</small></a>
+        </nav>
+      </details>
+    {% endif %}
+  </section>
+
+  {% if not turno %}
+    <section class="panel pos-opening" aria-labelledby="abrir-caixa-titulo">
+      <div class="pos-opening-copy">
+        <span class="pos-state-icon" aria-hidden="true">◷</span>
+        <span class="eyebrow">INÍCIO DO EXPEDIENTE</span>
+        <h2 id="abrir-caixa-titulo">Abrir o caixa</h2>
+        <p>Escolha o terminal e informe apenas o dinheiro disponível para troco. Nenhuma venda pode ser registrada antes desta abertura.</p>
+      </div>
+      {% if abrir_form.terminal_id.choices %}
+        <form method="post" action="{{ url_for('operacao.abrir', empresa_id=empresa.id) }}" class="pos-opening-form" novalidate data-confirm="Abrir este turno com o terminal e o fundo inicial informados?">
+          {{ abrir_form.hidden_tag() }}
+          <div class="field">{{ abrir_form.terminal_id.label }}{{ abrir_form.terminal_id() }}</div>
+          <div class="field">{{ abrir_form.valor_inicial.label }}{{ abrir_form.valor_inicial(inputmode='decimal', autocomplete='off', placeholder='0,00') }}<small>Valor físico contado na gaveta.</small></div>
+          {{ abrir_form.submit(class='button button-primary button-large', value='Abrir caixa') }}
+        </form>
+      {% else %}
+        <div class="pos-no-terminal">
+          <strong>Nenhum terminal ativo</strong>
+          {% if current_user.papel in ['proprietario', 'administrador'] %}
+            <a class="button button-primary" href="{{ url_for('operacao.configuracao', empresa_id=empresa.id) }}">Cadastrar terminal</a>
+          {% else %}
+            <small>Solicite o cadastro a um administrador.</small>
+          {% endif %}
+        </div>
+      {% endif %}
+    </section>
+  {% else %}
+    {% if not venda %}
+      <section class="pos-session-bar pos-session-bar-standalone" aria-label="Turno atual">
+        <div class="pos-session-live">
+          <span class="status-dot"></span>
+          <span><small>Caixa aberto</small><strong>{{ turno.terminal.codigo }}</strong></span>
+        </div>
+        <div><small>Operador</small><strong>{{ current_user.nome }}</strong></div>
+        <div><small>Início</small><strong>{{ turno.aberto_em|data_hora }}</strong></div>
+      </section>
+      <section class="panel pos-ready" aria-labelledby="nova-venda-titulo">
+        <span class="pos-state-icon" aria-hidden="true">▣</span>
+        <span class="eyebrow">CAIXA LIVRE</span>
+        <h2 id="nova-venda-titulo">Pronto para o próximo cliente</h2>
+        <p>Inicie a venda e o campo de leitura ficará pronto para receber o código digitado ou enviado pelo leitor.</p>
+        <form method="post" action="{{ url_for('caixa.iniciar', empresa_id=empresa.id) }}">
+          {{ iniciar_form.hidden_tag() }}
+          {{ iniciar_form.submit(class='button button-primary button-large', value='Nova venda') }}
+        </form>
+      </section>
+    {% else %}
+      {% set totais = namespace(quantidade=0, unidade='', unidade_mista=false) %}
+      {% for item in venda.itens %}
+        {% set totais.quantidade = totais.quantidade + item.quantidade %}
+        {% if loop.first %}
+          {% set totais.unidade = item.unidade %}
+        {% elif item.unidade != totais.unidade %}
+          {% set totais.unidade_mista = true %}
+        {% endif %}
+      {% endfor %}
+
+      <div class="pos-flow" data-checkout data-initial-step="{{ etapa_inicial }}" data-sale-total="{{ venda.total }}">
+        <section class="checkout-step-panel is-active" data-checkout-panel="produtos" aria-labelledby="venda-atual-titulo">
+          <div class="pos-workspace-grid">
+            <div class="pos-workspace-main">
+              <section class="pos-session-bar pos-session-bar-reference" aria-label="Turno atual">
+                <div class="pos-session-live">
+                  <span class="status-dot"></span>
+                  <span class="pos-session-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h10M7 15h3M14 15h3"/></svg>
+                  </span>
+                  <span><small>Caixa aberto</small><strong>{{ turno.terminal.codigo }}</strong></span>
+                </div>
+                <div>
+                  <span class="pos-session-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 21c.7-4.4 3.1-6.5 7-6.5s6.3 2.1 7 6.5"/></svg></span>
+                  <span><small>Operador</small><strong>{{ current_user.nome }}</strong></span>
+                </div>
+                <div>
+                  <span class="pos-session-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v6l4 2"/></svg></span>
+                  <span><small>Início</small><strong>{{ turno.aberto_em|data_hora }}</strong></span>
+                </div>
+                <div>
+                  <span class="pos-session-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6z"/><path d="M9 7h6M9 11h6M9 15h4"/></svg></span>
+                  <span><small>Venda atual</small><strong>#{{ venda.numero_formatado }}</strong></span>
+                </div>
+              </section>
+
+              <section class="pos-scan-card pos-scan-card-reference" aria-label="Leitura do produto">
+                <form method="post" action="{{ url_for('caixa.ler_codigo', empresa_id=empresa.id, venda_id=venda.id) }}" class="pos-scan-form pos-scan-form-reference" novalidate>
+                  {{ leitura_form.hidden_tag() }}
+                  <div class="field pos-code-field">
+                    <label for="{{ leitura_form.codigo.id }}"><span class="field-label-icon" aria-hidden="true">▥</span>Código do produto</label>
+                    {{ leitura_form.codigo(autocomplete='off', autocapitalize='characters', spellcheck='false', placeholder='Leia ou digite o código de barras', autofocus=true, **{'data-code-input': ''}) }}
+                    <small><span aria-hidden="true">ⓘ</span> Use o leitor de código de barras ou digite o código e pressione Enter.</small>
+                  </div>
+                  <div class="field pos-quantity-field">
+                    <label for="{{ leitura_form.quantidade.id }}">Quantidade ou peso</label>
+                    <div class="pos-quantity-input-wrap">
+                      {{ leitura_form.quantidade(autocomplete='off', inputmode='decimal', placeholder='1,000') }}
+                      <span class="pos-quantity-unit" aria-hidden="true">qtd/kg</span>
+                    </div>
+                    <small><span aria-hidden="true">ⓘ</span> Para produtos pesados, informe o peso (kg).</small>
+                  </div>
+                  <div class="pos-add-wrap">
+                    <button class="button button-primary button-large pos-add-button" type="submit">
+                      <span class="pos-add-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+                      </span>
+                      <span>Adicionar</span>
+                    </button>
+                    <small>Enter para adicionar</small>
+                  </div>
+                </form>
+              </section>
+
+              <section class="panel pos-cart pos-cart-reference" aria-labelledby="venda-atual-titulo">
+                <header class="pos-cart-header pos-cart-header-reference">
+                  <div class="pos-cart-title">
+                    <span class="pos-cart-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path d="M3 4h2l2.2 10.2h10.9L21 7H7"/><circle cx="9" cy="19" r="1.5"/><circle cx="18" cy="19" r="1.5"/></svg>
+                    </span>
+                    <h2 id="venda-atual-titulo">Produtos da venda</h2>
+                  </div>
+                  <strong class="pos-cart-count">{{ venda.itens|length }} {{ 'item' if venda.itens|length == 1 else 'itens' }}</strong>
+                </header>
+
+                <div class="pos-sale-table-wrap" data-auto-scroll-list>
+                  <table class="pos-sale-table">
+                    <thead>
+                      <tr>
+                        <th class="pos-col-index">#</th>
+                        <th>Código</th>
+                        <th>Descrição</th>
+                        <th>Qtd / Peso</th>
+                        <th>Unitário</th>
+                        <th>Subtotal</th>
+                        <th class="pos-col-actions"><span class="sr-only">Ações</span></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for item in venda.itens %}
+                        <tr class="pos-sale-row {% if loop.last %}is-last{% endif %}">
+                          <td class="pos-col-index">{{ loop.index }}</td>
+                          <td class="pos-sale-code">{{ item.codigo_lido }}</td>
+                          <td class="pos-sale-name">{{ item.produto_nome }}</td>
+                          <td class="pos-sale-qty">
+                            {% set item_form = formularios_itens[item.id] %}
+                            <form method="post" action="{{ url_for('caixa.alterar_item', empresa_id=empresa.id, venda_id=venda.id, item_id=item.id) }}" class="pos-inline-qty-form">
+                              {{ item_form.hidden_tag() }}
+                              <label class="sr-only" for="{{ item_form.quantidade.id }}">Quantidade ou peso de {{ item.produto_nome }}</label>
+                              {{ item_form.quantidade(inputmode='decimal', autocomplete='off', aria_label='Quantidade ou peso') }}
+                              <span>{{ item.unidade|lower }}</span>
+                              <button type="submit" class="pos-qty-save" title="Atualizar quantidade" aria-label="Atualizar quantidade de {{ item.produto_nome }}">✓</button>
+                            </form>
+                          </td>
+                          <td class="pos-sale-money">{{ item.preco_unitario|brl }}</td>
+                          <td class="pos-sale-money">{{ item.subtotal|brl }}</td>
+                          <td class="pos-col-actions">
+                            {% set remover_form = formularios_remover[item.id] %}
+                            <form method="post" action="{{ url_for('caixa.excluir_item', empresa_id=empresa.id, venda_id=venda.id, item_id=item.id) }}" data-confirm="Remover este produto da venda?">
+                              {{ remover_form.hidden_tag() }}
+                              <button type="submit" class="pos-remove-button" aria-label="Remover {{ item.produto_nome }}" title="Remover produto">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/></svg>
+                              </button>
+                            </form>
+                          </td>
+                        </tr>
+                      {% else %}
+                        <tr>
+                          <td colspan="7" class="pos-cart-empty">
+                            <div class="pos-cart-empty-copy">
+                              <strong>Leia o primeiro produto</strong>
+                              <small>O carrinho será preenchido aqui.</small>
+                            </div>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+
+                <footer class="pos-cart-footer">
+                  <span><span aria-hidden="true">🛒</span><strong>{{ venda.itens|length }}</strong> {{ 'item' if venda.itens|length == 1 else 'itens' }} no carrinho</span>
+                  <span><span aria-hidden="true">♙</span><strong>{{ totais.quantidade|quantidade }}</strong>{% if venda.itens and not totais.unidade_mista %} {{ totais.unidade|lower }}{% else %} no total{% endif %}</span>
+                  <span><span aria-hidden="true">◷</span>{% if venda.itens %}Último item adicionado agora{% else %}Aguardando primeiro item{% endif %}</span>
+                </footer>
+              </section>
+            </div>
+
+            <aside class="pos-order-summary pos-order-summary-reference" aria-label="Resumo da venda">
+              <header class="pos-summary-heading">
+                <span class="pos-summary-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6z"/><path d="M9 7h6M9 11h6M9 15h4"/></svg></span>
+                <h2>Resumo da venda</h2>
+              </header>
+
+              <div class="pos-summary-lines">
+                <div><span>Produtos</span><strong>{{ venda.itens|length }}</strong></div>
+                <div><span>Quantidade / Peso total</span><strong>{{ totais.quantidade|quantidade }}{% if venda.itens and not totais.unidade_mista %} {{ totais.unidade|lower }}{% endif %}</strong></div>
+                <div class="pos-summary-separator"><span>Subtotal</span><strong>{{ venda.total|brl }}</strong></div>
+                <div><span>Desconto</span><strong class="pos-discount-value">R$ 0,00</strong></div>
+              </div>
+
+              <div class="pos-order-total pos-order-total-reference">
+                <small>Total da venda</small>
+                <strong>{{ venda.total|brl }}</strong>
+              </div>
+
+              <button class="button button-primary button-large pos-charge-button" type="button" data-checkout-go="pagamento" {% if not venda.itens %}disabled{% endif %}>
+                <span class="pos-action-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 14h3"/></svg>
+                </span>
+                <strong>Cobrar</strong>
+                <small>F10</small>
+              </button>
+
+              <div class="pos-summary-actions">
+                <button type="button" class="pos-summary-danger-action" disabled title="A suspensão de venda não existe no backend atual; mantida apenas para preservar o layout solicitado.">
+                  <span aria-hidden="true">⏸</span><span><strong>Suspender venda</strong><small>F6</small></span>
+                </button>
+                <form method="post" action="{{ url_for('caixa.descartar', empresa_id=empresa.id, venda_id=venda.id) }}" data-confirm="Descartar esta venda? Nenhum estoque será movimentado." data-discard-sale>
+                  {{ descartar_form.hidden_tag() }}
+                  <button type="submit" class="pos-summary-danger-action">
+                    <span class="pos-danger-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/></svg>
+                    </span><span><strong>Descartar venda</strong><small>F8</small></span>
+                  </button>
+                </form>
+              </div>
+
+              <button type="button" class="pos-print-disabled" disabled title="O comprovante é emitido após a conclusão do pagamento pelo fluxo atual.">
+                <span aria-hidden="true">▣</span><span>Imprimir comprovante</span><small>F9</small>
+              </button>
+
+              <div class="pos-stock-note"><span aria-hidden="true">ⓘ</span><span>A baixa do estoque ocorre somente após o pagamento.</span></div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="checkout-step-panel" data-checkout-panel="pagamento" aria-labelledby="pagamento-titulo">
+          <div class="pos-payment-shell">
+            <header class="pos-payment-header">
+              <button type="button" class="button button-secondary" data-checkout-go="produtos">← Voltar à venda</button>
+              <div><span class="eyebrow">PAGAMENTO</span><h2 id="pagamento-titulo">Total {{ venda.total|brl }}</h2><p>Selecione como o cliente pagou.</p></div>
+            </header>
+            <form method="post" action="{{ url_for('caixa.finalizar', empresa_id=empresa.id, venda_id=venda.id) }}" class="panel pos-payment-form" novalidate data-confirm="Confirmar o pagamento e finalizar esta venda?" data-payment-form>
+              {{ finalizar_form.hidden_tag() }}
+              <fieldset class="payment-method-fieldset">
+                <legend>Forma de pagamento</legend>
+                <div class="payment-method-grid pos-payment-methods">
+                  <button type="button" class="payment-method" data-payment-method="dinheiro" aria-pressed="false"><span aria-hidden="true">R$</span><strong>Dinheiro</strong><small>Calcula troco</small></button>
+                  <button type="button" class="payment-method" data-payment-method="pix" aria-pressed="false"><span aria-hidden="true">◆</span><strong>PIX</strong><small>Valor total</small></button>
+                  <button type="button" class="payment-method" data-payment-method="debito" aria-pressed="false"><span aria-hidden="true">▰</span><strong>Débito</strong><small>Valor total</small></button>
+                  <button type="button" class="payment-method" data-payment-method="credito" aria-pressed="false"><span aria-hidden="true">▰</span><strong>Crédito</strong><small>Valor total</small></button>
+                  <button type="button" class="payment-method" data-payment-method="misto" aria-pressed="false"><span aria-hidden="true">＋</span><strong>Dividir</strong><small>Mais de uma forma</small></button>
+                </div>
+              </fieldset>
+
+              <div class="payment-fields" data-payment-fields>
+                <div class="payment-fields-intro" data-payment-intro><strong>Escolha uma forma acima</strong><p>Os campos necessários aparecerão aqui.</p></div>
+                <div class="field payment-field" data-payment-field="dinheiro">{{ finalizar_form.pagamento_dinheiro.label }}{{ finalizar_form.pagamento_dinheiro(inputmode='decimal', placeholder='0,00', autocomplete='off', **{'data-payment-input': 'dinheiro'}) }}</div>
+                <div class="field payment-field" data-payment-field="recebido">{{ finalizar_form.dinheiro_recebido.label }}{{ finalizar_form.dinheiro_recebido(inputmode='decimal', placeholder='Valor entregue', autocomplete='off', **{'data-payment-input': 'recebido'}) }}<small data-change-preview>O troco será validado pelo servidor.</small></div>
+                <div class="field payment-field" data-payment-field="pix">{{ finalizar_form.pagamento_pix.label }}{{ finalizar_form.pagamento_pix(inputmode='decimal', placeholder='0,00', autocomplete='off', **{'data-payment-input': 'pix'}) }}</div>
+                <div class="field payment-field" data-payment-field="debito">{{ finalizar_form.pagamento_debito.label }}{{ finalizar_form.pagamento_debito(inputmode='decimal', placeholder='0,00', autocomplete='off', **{'data-payment-input': 'debito'}) }}</div>
+                <div class="field payment-field" data-payment-field="credito">{{ finalizar_form.pagamento_credito.label }}{{ finalizar_form.pagamento_credito(inputmode='decimal', placeholder='0,00', autocomplete='off', **{'data-payment-input': 'credito'}) }}</div>
+              </div>
+
+              <div class="payment-confirmation pos-payment-review" data-payment-confirmation>
+                <div><span>Pagamento selecionado</span><strong data-payment-label>—</strong><small>Venda, pagamento, estoque e impressão serão registrados juntos.</small></div>
+                {{ finalizar_form.submit(class='button button-primary button-large', value='Receber e finalizar', **{'data-payment-submit': ''}) }}
+              </div>
+            </form>
+          </div>
+        </section>
+      </div>
+    {% endif %}
+  {% endif %}
+{% endblock %}

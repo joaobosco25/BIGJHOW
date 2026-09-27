@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Documento {{ documento.numero_formatado }} · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <div>
+      <span class="eyebrow">FISCAL / DOCUMENTO</span>
+      <h1>{{ documento.modelo }} · nº {{ documento.numero_formatado }} · série {{ documento.serie }}</h1>
+      <p><span class="code">{{ documento.chave_formatada }}</span></p>
+    </div>
+    <div class="header-actions">
+      <a class="button button-secondary" href="{{ url_for('fiscal.danfe', empresa_id=empresa.id, documento_id=documento.id) }}">Ver cupom</a>
+      <a class="back-link" href="{{ url_for('fiscal.documentos', empresa_id=empresa.id) }}">← Voltar</a>
+    </div>
+  </section>
+
+  {% if documento.sem_valor_fiscal %}
+    <div class="notice"><strong>Documento de ensaio.</strong> Não foi transmitido à SEFAZ e não tem valor fiscal.</div>
+  {% elif documento.ambiente == 2 %}
+    <div class="notice"><strong>Ambiente de homologação.</strong> Este documento não tem valor fiscal.</div>
+  {% endif %}
+
+  <section class="panel">
+    <div class="section-heading"><h2>Situação</h2></div>
+    <ul class="detail-list">
+      <li><span>Status</span><strong>{{ documento.status_rotulo }}</strong></li>
+      <li><span>Retorno da SEFAZ</span><strong>{{ documento.codigo_status or '—' }} · {{ documento.mensagem_status or 'sem mensagem' }}</strong></li>
+      <li><span>Protocolo de autorização</span><strong>{{ documento.protocolo_autorizacao or '—' }}</strong></li>
+      <li><span>Emissão</span><strong>{{ documento.data_emissao|data_hora }}</strong></li>
+      <li><span>Autorização</span><strong>{{ documento.data_autorizacao|data_hora }}</strong></li>
+      <li><span>Ambiente</span><strong>{{ 'Produção' if documento.ambiente == 1 else 'Homologação' }}</strong></li>
+      <li><span>Rota de emissão</span><strong>{{ documento.provedor }}</strong></li>
+      <li><span>Tentativas</span><strong>{{ documento.tentativas }}</strong></li>
+      {% if documento.protocolo_cancelamento %}
+        <li><span>Cancelamento</span><strong>{{ documento.protocolo_cancelamento }} — {{ documento.motivo_cancelamento }}</strong></li>
+      {% endif %}
+    </ul>
+    <div class="form-actions">
+      {% for arquivo in documento.arquivos %}
+        <a class="button button-secondary" href="{{ url_for('fiscal.documento_xml', empresa_id=empresa.id, documento_id=documento.id, tipo=arquivo.tipo) }}">XML {{ arquivo.tipo }}</a>
+      {% endfor %}
+      {% if documento.status in ['pendente', 'contingencia', 'falhou', 'processando'] and documento.provedor == 'sefaz_direto' %}
+        <form method="post" action="{{ url_for('fiscal.consultar_documento_sefaz', empresa_id=empresa.id, documento_id=documento.id) }}">
+          {{ acao_form.hidden_tag() }}
+          <button class="button button-primary" type="submit">Consultar na SEFAZ</button>
+        </form>
+      {% elif documento.status in ['pendente', 'contingencia', 'falhou', 'processando'] %}
+        <form method="post" action="{{ url_for('fiscal.reenviar_documento', empresa_id=empresa.id, documento_id=documento.id) }}">
+          {{ acao_form.hidden_tag() }}
+          <button class="button button-primary" type="submit">Reprocessar documento</button>
+        </form>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading"><h2>Itens</h2></div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>#</th><th>Produto</th><th>NCM</th><th>CFOP</th><th class="number">Qtd.</th><th class="number">Unitário</th><th class="number">Total</th></tr></thead>
+        <tbody>
+          {% for item in documento.itens %}
+            <tr>
+              <td>{{ item.numero_item }}</td>
+              <td><strong>{{ item.descricao }}</strong><small class="subline">{{ item.codigo_produto }}</small></td>
+              <td><span class="code">{{ item.ncm }}</span></td>
+              <td><span class="code">{{ item.cfop }}</span></td>
+              <td class="number">{{ item.quantidade|quantidade }} {{ item.unidade }}</td>
+              <td class="number">{{ item.valor_unitario|brl }}</td>
+              <td class="number">{{ item.valor_total|brl }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <ul class="detail-list">
+      <li><span>Produtos</span><strong>{{ documento.total_produtos|brl }}</strong></li>
+      <li><span>Desconto</span><strong>{{ documento.total_desconto|brl }}</strong></li>
+      <li><span>Total do documento</span><strong>{{ documento.total_documento|brl }}</strong></li>
+    </ul>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading"><h2>Trilha de tentativas</h2></div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Quando</th><th>Tipo</th><th>Retorno</th><th>Mensagem</th></tr></thead>
+        <tbody>
+          {% for evento in documento.eventos %}
+            <tr>
+              <td>{{ evento.criado_em|data_hora }}</td>
+              <td>{{ evento.tipo }}</td>
+              <td>{{ evento.codigo_status or '—' }}</td>
+              <td>{{ evento.mensagem or '—' }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4">Sem registros.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {% if documento.status == 'autorizado' %}
+    <section class="panel cancel-panel">
+      <div class="section-heading">
+        <h2>Cancelar na SEFAZ</h2>
+        <p>
+          O prazo de cancelamento da NFC-e é curto — na maioria das UFs, trinta
+          minutos após a autorização. Passado o prazo, o caminho é a devolução.
+        </p>
+      </div>
+      <form method="post" action="{{ url_for('fiscal.cancelar', empresa_id=empresa.id, documento_id=documento.id) }}" class="stacked-form">
+        {{ cancelar_form.hidden_tag() }}
+        <div class="field">{{ cancelar_form.justificativa.label }} {{ cancelar_form.justificativa(rows=3) }}</div>
+        <div class="form-actions">{{ cancelar_form.submit(class="button button-danger") }}</div>
+      </form>
+    </section>
+  {% endif %}
+{% endblock %}

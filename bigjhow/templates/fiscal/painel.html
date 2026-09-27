@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Fiscal · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <div>
+      <span class="eyebrow">OPERAÇÃO / FISCAL</span>
+      <h1>Documento fiscal</h1>
+      <p>Emissão de NFC-e e CF-e, numeração, inutilização e acervo de XML.</p>
+    </div>
+    <div class="header-actions">
+      <a class="button button-secondary" href="{{ url_for('fiscal.produtos', empresa_id=empresa.id) }}">
+        Classificar produtos{% if prontidao.produtos_sem_classificacao or prontidao.produtos_aguardando_revisao %}
+          ({{ (prontidao.produtos_sem_classificacao or 0) + (prontidao.produtos_aguardando_revisao or 0) }})
+        {% endif %}
+      </a>
+      <a class="button button-secondary" href="{{ url_for('fiscal.documentos', empresa_id=empresa.id) }}">Documentos</a>
+      <a class="button button-primary" href="{{ url_for('fiscal.configuracao', empresa_id=empresa.id) }}">Configuração fiscal</a>
+    </div>
+  </section>
+
+  {% if not chave_configurada %}
+    <div class="notice">
+      <strong>FISCAL_SECRET_KEY não está definida no servidor.</strong>
+      Sem ela o sistema não guarda CSC, senha de certificado nem token de gateway.
+      Defina a variável no ambiente da VPS e reinicie a aplicação.
+    </div>
+  {% endif %}
+
+  {% if prontidao.pode_emitir and prontidao.com_valor_fiscal %}
+    <div class="notice">
+      <strong>Emissão ativa em produção.</strong>
+      Cada venda finalizada gera documento fiscal com valor legal.
+    </div>
+  {% elif prontidao.pode_emitir %}
+    <div class="notice">
+      <strong>Emissão ativa em homologação.</strong>
+      Os documentos gerados servem para teste e <strong>não têm valor fiscal</strong>.
+      Vire para produção só depois de homologar com a SEFAZ.
+    </div>
+  {% else %}
+    <div class="notice">
+      <strong>Emissão desligada.</strong>
+      O caixa segue vendendo normalmente e emitindo o comprovante não fiscal,
+      mas nenhuma NFC-e é gerada até as pendências abaixo serem resolvidas.
+    </div>
+  {% endif %}
+
+  <section class="metric-grid" aria-label="Indicadores fiscais">
+    <article class="metric-card">
+      <span>Autorizados</span><strong>{{ resumo.autorizados or 0 }}</strong><small>documentos aceitos pela SEFAZ</small>
+    </article>
+    <article class="metric-card warning">
+      <span>Pendentes</span><strong>{{ resumo.pendentes or 0 }}</strong><small>aguardando transmissão</small>
+    </article>
+    <article class="metric-card attention">
+      <span>Rejeitados</span><strong>{{ resumo.rejeitados or 0 }}</strong><small>precisam de correção</small>
+    </article>
+    <article class="metric-card muted">
+      <span>Próximo número</span>
+      <strong>{{ resumo.proximo_numero if resumo.configurado else '—' }}</strong>
+      <small>{% if resumo.configurado %}série {{ resumo.serie }} · modelo {{ resumo.modelo }}{% else %}sem configuração{% endif %}</small>
+    </article>
+  </section>
+
+  {% for aviso in prontidao.avisos %}
+    <div class="notice">{{ aviso }}</div>
+  {% endfor %}
+
+  {% if prontidao.pendencias %}
+    <section class="panel">
+      <div class="section-heading">
+        <h2>O que falta para emitir com valor fiscal</h2>
+        <p>{{ prontidao.orientacao }}</p>
+      </div>
+      <ul class="detail-list">
+        {% for pendencia in prontidao.pendencias %}
+          <li><span>Pendência</span><strong>{{ pendencia }}</strong></li>
+        {% endfor %}
+      </ul>
+      <div class="form-actions">
+        <a class="button button-primary" href="{{ url_for('fiscal.configuracao', empresa_id=empresa.id) }}">Resolver configuração</a>
+        {% if prontidao.produtos_sem_classificacao %}
+          <a class="button button-secondary" href="{{ url_for('fiscal.produtos', empresa_id=empresa.id) }}">
+            Classificar {{ prontidao.produtos_sem_classificacao }} produto(s)
+          </a>
+        {% endif %}
+      </div>
+    </section>
+  {% endif %}
+
+  <section class="panel">
+    <div class="toolbar">
+      <div class="section-heading"><h2>Últimos documentos</h2></div>
+      <div class="header-actions">
+        <form method="post" action="{{ url_for('fiscal.consultar_status', empresa_id=empresa.id) }}">
+          {{ acao_form.hidden_tag() }}
+          <button class="button button-secondary" type="submit">Consultar status da SEFAZ</button>
+        </form>
+        <a class="button button-secondary" href="{{ url_for('fiscal.inutilizacoes', empresa_id=empresa.id) }}">
+          Inutilizações{% if resumo.inutilizacoes_pendentes %} ({{ resumo.inutilizacoes_pendentes }}){% endif %}
+        </a>
+        {% if current_user.papel == 'proprietario' %}
+          <a class="button button-secondary" href="{{ url_for('fiscal.importar', empresa_id=empresa.id) }}">Importar acervo</a>
+        {% endif %}
+      </div>
+    </div>
+    {% if ultimos %}
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Número</th><th>Série</th><th>Emissão</th><th class="number">Total</th><th>Status</th><th class="actions">Ações</th></tr></thead>
+          <tbody>
+            {% for documento in ultimos %}
+              <tr>
+                <td><span class="code">{{ documento.numero_formatado }}</span></td>
+                <td>{{ documento.serie }}</td>
+                <td>{{ documento.data_emissao|data_hora }}</td>
+                <td class="number">{{ documento.total_documento|brl }}</td>
+                <td>
+                  {% if documento.status == 'autorizado' and not documento.sem_valor_fiscal %}
+                    <span class="badge badge-success">{{ documento.status_rotulo }}</span>
+                  {% elif documento.status in ['rejeitado', 'denegado', 'falhou'] %}
+                    <span class="badge badge-danger">{{ documento.status_rotulo }}</span>
+                  {% else %}
+                    <span class="badge badge-warning">{{ documento.status_rotulo }}</span>
+                  {% endif %}
+                  {% if documento.sem_valor_fiscal %}<small class="subline">sem valor fiscal</small>{% endif %}
+                </td>
+                <td class="actions">
+                  <a class="button button-subtle" href="{{ url_for('fiscal.documento_detalhe', empresa_id=empresa.id, documento_id=documento.id) }}">Abrir</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <p>Nenhum documento fiscal emitido ainda.</p>
+        <a class="button button-secondary" href="{{ url_for('fiscal.importar', empresa_id=empresa.id) }}">Importar acervo do sistema antigo</a>
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

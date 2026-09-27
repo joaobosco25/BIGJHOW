@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Classificação fiscal · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <div>
+      <span class="eyebrow">FISCAL / PRODUTOS</span>
+      <h1>Classificação fiscal</h1>
+      <p>NCM, CFOP e situação tributária. Item sem classificação impede a emissão da venda inteira.</p>
+    </div>
+    <a class="back-link" href="{{ url_for('fiscal.painel', empresa_id=empresa.id) }}">← Voltar ao painel fiscal</a>
+  </section>
+
+  <section class="panel">
+    <div class="toolbar">
+      <nav class="filter-tabs" aria-label="Filtrar produtos">
+        <a class="{% if somente_pendentes %}selected{% endif %}" href="{{ url_for('fiscal.produtos', empresa_id=empresa.id, pendentes=1) }}">Pendentes</a>
+        <a class="{% if not somente_pendentes %}selected{% endif %}" href="{{ url_for('fiscal.produtos', empresa_id=empresa.id, pendentes=0) }}">Todos</a>
+      </nav>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Produto</th><th>Unidade</th><th>NCM</th><th>CFOP</th><th>Situação tributária</th><th class="actions">Ações</th></tr></thead>
+        <tbody>
+          {% for produto, fiscal in registros %}
+            <tr>
+              <td><strong>{{ produto.nome }}</strong><small class="subline">{{ produto.sku_interno }}</small></td>
+              <td>{{ produto.unidade }}</td>
+              <td>{% if fiscal %}<span class="code">{{ fiscal.ncm }}</span>{% else %}—{% endif %}</td>
+              <td>{% if fiscal %}<span class="code">{{ fiscal.cfop }}</span>{% else %}—{% endif %}</td>
+              <td>
+                {% if fiscal and fiscal.completo and not fiscal.revisao_pendente %}
+                  <span class="badge badge-success">{{ fiscal.icms_csosn or fiscal.icms_cst }}</span>
+                {% else %}
+                  <span class="badge badge-warning">pendente</span>
+                {% endif %}
+              </td>
+              <td class="actions">
+                <a class="button button-subtle" href="{{ url_for('fiscal.classificar', empresa_id=empresa.id, produto_id=produto.id) }}">Classificar</a>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6"><div class="empty-state"><p>Nenhum produto nesta situação.</p></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <h2>Classificar tudo de uma vez</h2>
+      <p>
+        Um açougue costuma ter quase todos os itens na mesma classificação.
+        Aplique a regra geral aqui e depois ajuste as exceções item a item.
+        Confira com o contador antes: NCM errado gera nota errada em série.
+      </p>
+    </div>
+    <form method="post" action="{{ url_for('fiscal.classificar_em_lote', empresa_id=empresa.id) }}" class="stacked-form">
+      {{ lote_form.hidden_tag() }}
+      <div class="form-grid">
+        <div class="field">{{ lote_form.ncm.label }} {{ lote_form.ncm(placeholder="02013000") }}</div>
+        <div class="field">{{ lote_form.cfop.label }} {{ lote_form.cfop() }}</div>
+        <div class="field">{{ lote_form.origem.label }} {{ lote_form.origem() }}</div>
+        <div class="field">{{ lote_form.icms_csosn.label }} {{ lote_form.icms_csosn() }}</div>
+        <div class="field">{{ lote_form.icms_cst.label }} {{ lote_form.icms_cst() }}</div>
+        <div class="field">{{ lote_form.icms_aliquota.label }} {{ lote_form.icms_aliquota() }}</div>
+        <div class="field">{{ lote_form.pis_cst.label }} {{ lote_form.pis_cst() }}</div>
+        <div class="field">{{ lote_form.cofins_cst.label }} {{ lote_form.cofins_cst() }}</div>
+        <div class="field">{{ lote_form.confirmacao.label }} {{ lote_form.confirmacao(placeholder="APLICAR") }}</div>
+      </div>
+      <div class="form-actions">{{ lote_form.submit(class="button button-primary") }}</div>
+    </form>
+  </section>
+{% endblock %}

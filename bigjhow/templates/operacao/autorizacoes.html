@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Autorizações do caixa · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <div>
+      <a class="back-link" href="{{ url_for('operacao.painel', empresa_id=empresa.id) }}">← Voltar ao caixa</a>
+      <span class="eyebrow">{{ empresa.nome|upper }} / CONTROLE ADMINISTRATIVO</span>
+      <h1>Autorizações do caixa</h1>
+      <p>Confira cada solicitação antes de autorizar a entrada ou saída de dinheiro.</p>
+    </div>
+    {% if pendentes %}<span class="badge badge-warning">{{ pendentes|length }} pendente(s)</span>{% endif %}
+  </section>
+
+  <section class="panel operation-pending-panel">
+    {% if pendentes %}
+      <div class="operation-pending-list">
+        {% for item in pendentes %}
+          {% set form = formularios_decisao[item.id] %}
+          <article class="operation-pending-item">
+            <div><span>{{ item.tipo_rotulo }}</span><strong>{{ item.valor|brl }}</strong><small>{{ item.solicitado_por.nome if item.solicitado_por else 'Usuário removido' }} · {{ item.turno.terminal.codigo }} · {{ item.motivo }}</small></div>
+            <form method="post" class="decision-form" novalidate>
+              {{ form.hidden_tag() }}
+              <div class="field"><label for="{{ form.motivo.id }}">Justificativa da decisão</label>{{ form.motivo(rows='2', placeholder='Descreva a conferência') }}</div>
+              <button class="button button-primary" formaction="{{ url_for('operacao.decidir', empresa_id=empresa.id, movimento_id=item.id, decisao='aprovar') }}">Aprovar</button>
+              <button class="button button-danger" formaction="{{ url_for('operacao.decidir', empresa_id=empresa.id, movimento_id=item.id, decisao='rejeitar') }}">Rejeitar</button>
+            </form>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="operation-empty-state"><span aria-hidden="true">✓</span><strong>Nenhuma autorização pendente</strong><small>Novas solicitações aparecerão aqui.</small></div>
+    {% endif %}
+  </section>
+{% endblock %}

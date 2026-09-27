@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?defina POSTGRES_DB no arquivo .env}
+      POSTGRES_USER: ${POSTGRES_USER:?defina POSTGRES_USER no arquivo .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no arquivo .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  web:
+    build: .
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      # O container roda com o sistema de arquivos somente leitura. O /tmp
+      # gravável é necessário para o módulo fiscal: a autenticação mútua com a
+      # SEFAZ exige o certificado em PEM temporário, escrito e apagado a cada
+      # transmissão.
+      - /tmp:size=64m,mode=1777
+    volumes:
+      # Certificado digital A1. Descomente e ajuste o caminho do lado esquerdo
+      # para o local do .pfx na VPS. Somente leitura de propósito: a aplicação
+      # nunca precisa alterar o certificado.
+      # - /etc/bigjhow/certificado.pfx:/certificados/certificado.pfx:ro
+      #
+      # Pasta trocada com o emissor TPA da loja, quando a rota de emissão for a
+      # ponte. Exige que a VPS alcance a rede da loja (VPN ou túnel).
+      # - /var/bigjhow/fiscal:/fiscal
+      []
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks:
+      - frontend
+      - backend
+
+volumes:
+  postgres_data:
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    internal: true
+

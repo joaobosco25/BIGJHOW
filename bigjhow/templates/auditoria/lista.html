@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}Auditoria{% endblock %}
+{% block content %}
+  {% set total_paginas = registros.pages if registros.pages else 1 %}
+  {% set filtros_ativos = data_inicio or data_fim or usuario_id or empresa_id is not none or acao %}
+  {% set rotulos_detalhes = {
+    'numero': 'Número da venda',
+    'produto_id': 'Produto',
+    'quantidade': 'Quantidade',
+    'subtotal': 'Subtotal',
+    'total': 'Total',
+    'troco': 'Troco',
+    'itens': 'Itens',
+    'pagamentos': 'Pagamentos',
+    'trabalhos_impressao': 'Impressões geradas',
+    'turno_id': 'Turno',
+    'terminal_id': 'Terminal',
+    'motivo': 'Motivo',
+    'usuario': 'Usuário',
+    'ativo': 'Ativo',
+    'prefixo': 'Prefixo',
+    'tamanho_plu': 'Tamanho do PLU',
+    'conteudo': 'Conteúdo',
+    'casas_decimais': 'Casas decimais',
+    'linhas': 'Linhas geradas',
+    'balanca': 'Leitura da balança'
+  } %}
+
+  <section class="page-header audit-page-header">
+    <div>
+      <span class="eyebrow">SEGURANÇA E RASTREABILIDADE</span>
+      <h1>Auditoria</h1>
+      <p>Acompanhe a trilha de ações do sistema e identifique com clareza quem fez, o que foi feito, quando, onde e quais dados acompanharam o evento.</p>
+    </div>
+    <span class="readonly-badge audit-readonly">SOMENTE LEITURA</span>
+  </section>
+
+  {% if erro_filtro %}<div class="flash flash-erro" role="alert">{{ erro_filtro }}</div>{% endif %}
+
+  <section class="audit-summary-grid" aria-label="Resumo da auditoria">
+    <article class="audit-summary-card">
+      <span>Eventos encontrados</span>
+      <strong>{{ registros.total }}</strong>
+      <small>Quantidade total correspondente aos filtros atuais.</small>
+    </article>
+    <article class="audit-summary-card">
+      <span>Nesta página</span>
+      <strong>{{ registros.items|length }}</strong>
+      <small>Até 50 eventos são exibidos por página.</small>
+    </article>
+    <article class="audit-summary-card">
+      <span>Posição</span>
+      <strong>{{ registros.page }}/{{ total_paginas }}</strong>
+      <small>Página atual dentro do resultado consultado.</small>
+    </article>
+    <article class="audit-summary-card audit-summary-card-safe">
+      <span>Modo da tela</span>
+      <strong>Leitura</strong>
+      <small>Esta interface consulta os registros; não oferece edição deles.</small>
+    </article>
+  </section>
+
+  <section class="panel audit-guide" aria-labelledby="audit-guide-title">
+    <div class="audit-section-heading">
+      <div>
+        <span class="eyebrow">COMO LER A TRILHA</span>
+        <h2 id="audit-guide-title">Cada evento responde quatro perguntas</h2>
+      </div>
+      <p>Use os dados abaixo para conferir vendas, estoque, acessos, cadastros e alterações administrativas.</p>
+    </div>
+    <div class="audit-guide-grid">
+      <div><span class="audit-guide-number">01</span><strong>Quem?</strong><small>Usuário responsável ou processo do sistema.</small></div>
+      <div><span class="audit-guide-number">02</span><strong>O quê?</strong><small>Ação executada e registro que foi afetado.</small></div>
+      <div><span class="audit-guide-number">03</span><strong>Quando e onde?</strong><small>Data, hora, empresa e endereço IP de origem.</small></div>
+      <div><span class="audit-guide-number">04</span><strong>Com quais dados?</strong><small>Informações técnicas gravadas junto ao evento.</small></div>
+    </div>
+  </section>
+
+  <section class="panel filter-panel audit-filter-panel" aria-labelledby="audit-filter-title">
+    <div class="audit-filter-head">
+      <div>
+        <span class="eyebrow">CONSULTA</span>
+        <h2 id="audit-filter-title">Filtrar trilha de auditoria</h2>
+        <p>Combine período, usuário, empresa e tipo de ação para localizar um evento específico.</p>
+      </div>
+      {% if filtros_ativos %}<span class="audit-filter-status">Filtros aplicados</span>{% else %}<span class="audit-filter-status is-neutral">Sem filtros</span>{% endif %}
+    </div>
+
+    <form method="get" class="audit-filters">
+      <div class="field">
+        <label for="data_inicio">Data inicial</label>
+        <input id="data_inicio" name="data_inicio" type="date" value="{{ data_inicio }}">
+      </div>
+      <div class="field">
+        <label for="data_fim">Data final</label>
+        <input id="data_fim" name="data_fim" type="date" value="{{ data_fim }}">
+      </div>
+      <div class="field">
+        <label for="usuario_id">Usuário</label>
+        <select id="usuario_id" name="usuario_id">
+          <option value="">Todos</option>
+          {% for item in usuarios_filtro %}<option value="{{ item.id }}" {% if usuario_id == item.id|string %}selected{% endif %}>{{ item.nome }} · @{{ item.usuario }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="empresa_id">Empresa</label>
+        <select id="empresa_id" name="empresa_id">
+          <option value="">Todas</option>
+          {% for item in empresas %}<option value="{{ item.id }}" {% if empresa_id == item.id %}selected{% endif %}>{{ item.nome }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="acao">Ação</label>
+        <select id="acao" name="acao">
+          <option value="">Todas</option>
+          {% for item in acoes %}<option value="{{ item }}" {% if acao == item %}selected{% endif %}>{{ rotulos_acoes.get(item, item|replace('_', ' ')|capitalize) }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="filter-actions">
+        <a class="button button-secondary" href="{{ url_for('auditoria.lista') }}">Limpar filtros</a>
+        <button class="button button-primary" type="submit">Aplicar filtros</button>
+      </div>
+    </form>
+
+    {% if filtros_ativos %}
+      <div class="audit-active-filters" aria-label="Filtros ativos">
+        <span class="audit-active-filters-label">Exibindo:</span>
+        {% if data_inicio %}<span class="audit-filter-chip">Desde {{ data_inicio }}</span>{% endif %}
+        {% if data_fim %}<span class="audit-filter-chip">Até {{ data_fim }}</span>{% endif %}
+        {% if usuario_id %}
+          {% for item in usuarios_filtro %}{% if usuario_id == item.id|string %}<span class="audit-filter-chip">{{ item.nome }} · @{{ item.usuario }}</span>{% endif %}{% endfor %}
+        {% endif %}
+        {% if empresa_id is not none %}
+          {% for item in empresas %}{% if empresa_id == item.id %}<span class="audit-filter-chip">{{ item.nome }}</span>{% endif %}{% endfor %}
+        {% endif %}
+        {% if acao %}<span class="audit-filter-chip">{{ rotulos_acoes.get(acao, acao|replace('_', ' ')|capitalize) }}</span>{% endif %}
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="panel audit-log-panel" aria-labelledby="audit-events-title">
+    <header class="audit-log-head">
+      <div>
+        <span class="eyebrow">HISTÓRICO</span>
+        <h2 id="audit-events-title">Eventos registrados</h2>
+      </div>
+      <span>{{ registros.total }} registro(s)</span>
+    </header>
+
+    <div class="audit-event-list">
+      {% for registro in registros.items %}
+        {% set categoria = 'Sistema' %}
+        {% set categoria_classe = 'system' %}
+        {% if registro.acao.startswith('venda_') %}
+          {% set categoria = 'Caixa e vendas' %}
+          {% set categoria_classe = 'sale' %}
+        {% elif 'estoque' in registro.acao or 'inventario' in registro.acao or registro.acao.startswith('produto_') or registro.acao.startswith('codigo_produto_') %}
+          {% set categoria = 'Estoque e cadastro' %}
+          {% set categoria_classe = 'stock' %}
+        {% elif registro.acao.startswith('login_') or registro.acao == 'logout' or 'senha' in registro.acao or registro.acao.startswith('usuario_') %}
+          {% set categoria = 'Acesso e usuários' %}
+          {% set categoria_classe = 'security' %}
+        {% elif registro.acao.startswith('balanca_') %}
+          {% set categoria = 'Balança' %}
+          {% set categoria_classe = 'scale' %}
+        {% elif registro.acao.startswith('fiscal_') or 'documento_fiscal' in registro.acao or 'inutilizacao' in registro.acao %}
+          {% set categoria = 'Fiscal' %}
+          {% set categoria_classe = 'fiscal' %}
+        {% endif %}
+
+        <article class="audit-event audit-event-{{ categoria_classe }}">
+          <div class="audit-event-marker" aria-hidden="true"><span></span></div>
+          <div class="audit-event-body">
+            <header class="audit-event-header">
+              <div class="audit-event-title">
+                <div class="audit-event-badges">
+                  <span class="audit-category-badge">{{ categoria }}</span>
+                  <span class="audit-event-code">{{ registro.acao }}</span>
+                </div>
+                <h3>{{ rotulos_acoes.get(registro.acao, registro.acao|replace('_', ' ')|capitalize) }}</h3>
+                <p>{{ registro.criado_em|data_hora }}</p>
+              </div>
+              <span class="audit-event-id" title="Identificador completo do registro">ID {{ registro.id|string|truncate(13, True, '') }}</span>
+            </header>
+
+            <div class="audit-event-meta">
+              <div>
+                <span>Responsável</span>
+                {% if registro.usuario %}
+                  <strong>{{ registro.usuario.nome }}</strong>
+                  <small>@{{ registro.usuario.usuario }}</small>
+                {% else %}
+                  <strong>Sistema</strong>
+                  <small>Usuário não associado ou removido</small>
+                {% endif %}
+              </div>
+              <div>
+                <span>Empresa</span>
+                <strong>{{ registro.empresa.nome if registro.empresa else 'Grupo / Sistema' }}</strong>
+                <small>Contexto em que o evento ocorreu</small>
+              </div>
+              <div>
+                <span>Registro afetado</span>
+                <strong>{{ registro.entidade|replace('_', ' ')|capitalize }}</strong>
+                <small>{{ registro.entidade_id or 'Sem identificador específico' }}</small>
+              </div>
+              <div>
+                <span>Origem</span>
+                <strong class="audit-ip">{{ registro.ip or 'Não disponível' }}</strong>
+                <small>Endereço IP registrado</small>
+              </div>
+            </div>
+
+            <details class="audit-details">
+              <summary>
+                <span>
+                  <strong>Dados do evento</strong>
+                  <small>{% if registro.detalhes %}{{ registro.detalhes|length }} campo(s) adicional(is) · clique para conferir{% else %}Nenhum dado adicional foi gravado{% endif %}</small>
+                </span>
+                <span class="audit-details-arrow" aria-hidden="true">⌄</span>
+              </summary>
+              <div class="audit-details-content">
+                {% if registro.detalhes %}
+                  <dl class="audit-detail-grid">
+                    {% for chave, valor in registro.detalhes.items() %}
+                      <div>
+                        <dt>{{ rotulos_detalhes.get(chave, chave|replace('_', ' ')|capitalize) }}</dt>
+                        <dd>
+                          {% if valor is mapping or (valor is sequence and valor is not string) %}
+                            <pre>{{ valor|tojson(indent=2) }}</pre>
+                          {% elif valor is sameas true %}
+                            Sim
+                          {% elif valor is sameas false %}
+                            Não
+                          {% elif valor is none %}
+                            <span class="muted-text">Não informado</span>
+                          {% else %}
+                            {{ valor }}
+                          {% endif %}
+                        </dd>
+                      </div>
+                    {% endfor %}
+                  </dl>
+                {% else %}
+                  <p class="audit-no-details">Este evento não possui informações adicionais além dos metadados exibidos acima.</p>
+                {% endif %}
+
+                <div class="audit-technical-trace">
+                  <span>Identificador completo da auditoria</span>
+                  <code>{{ registro.id }}</code>
+                </div>
+              </div>
+            </details>
+          </div>
+        </article>
+      {% else %}
+        <div class="audit-empty-state">
+          <strong>Nenhum registro encontrado</strong>
+          <p>Não há eventos correspondentes aos filtros selecionados. Ajuste a consulta ou limpe os filtros para ampliar o resultado.</p>
+          {% if filtros_ativos %}<a class="button button-secondary" href="{{ url_for('auditoria.lista') }}">Limpar filtros</a>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if registros.pages > 1 %}
+      <nav class="pagination audit-pagination" aria-label="Paginação">
+        {% if registros.has_prev %}<a href="{{ url_for('auditoria.lista', data_inicio=data_inicio, data_fim=data_fim, usuario_id=usuario_id, empresa_id=empresa_id, acao=acao, page=registros.prev_num) }}">← Página anterior</a>{% else %}<span></span>{% endif %}
+        <span>Página {{ registros.page }} de {{ registros.pages }} · {{ registros.total }} registros</span>
+        {% if registros.has_next %}<a href="{{ url_for('auditoria.lista', data_inicio=data_inicio, data_fim=data_fim, usuario_id=usuario_id, empresa_id=empresa_id, acao=acao, page=registros.next_num) }}">Próxima página →</a>{% else %}<span></span>{% endif %}
+      </nav>
+    {% endif %}
+  </section>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Estoque do grupo{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <div><span class="eyebrow">GRUPO BIG JHOW</span><h1>Visão consolidada do estoque</h1><p>Selecione uma empresa para operar seus produtos e saldos.</p></div>
+  </section>
+  <section class="company-grid">
+    {% for card in cards %}
+      <a class="company-card" href="{{ url_for('estoque.lista', empresa_id=card.empresa.id) }}">
+        <div class="company-card-head"><span class="company-monogram">{{ card.empresa.nome.replace('Big Jhow ', '')[:2]|upper }}</span><span>ABRIR ESTOQUE →</span></div>
+        <h2>{{ card.empresa.nome }}</h2>
+        <div class="company-stats"><div><strong>{{ card.total }}</strong><span>itens ativos</span></div><div><strong>{{ card.inventario }}</strong><span>sem inventário</span></div><div><strong>{{ card.revisao }}</strong><span>para revisar</span></div></div>
+      </a>
+    {% endfor %}
+  </section>
+  <section class="roadmap-panel"><span class="eyebrow">ESTRUTURA PREPARADA</span><h2>Uma base para toda a operação</h2><p>Vendas, compras, financeiro, CMV, perdas e relatórios já aparecem na navegação como próximos módulos, mantendo o estoque como única função ativa nesta entrega.</p></section>
+{% endblock %}
+

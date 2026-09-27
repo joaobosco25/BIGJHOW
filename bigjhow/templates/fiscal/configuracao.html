@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Configuração fiscal · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <div>
+      <span class="eyebrow">FISCAL / CONFIGURAÇÃO</span>
+      <h1>Configuração fiscal</h1>
+      <p>Dados do emitente, numeração, rota de emissão e credenciais.</p>
+    </div>
+    <a class="back-link" href="{{ url_for('fiscal.painel', empresa_id=empresa.id) }}">← Voltar ao painel fiscal</a>
+  </section>
+
+  <div class="notice">
+    <strong>Os endereços de serviço não vêm preenchidos de fábrica.</strong>
+    Eles mudam por UF e ao longo do tempo; um endereço errado faria a loja emitir
+    contra o lugar errado sem aviso. Copie-os do portal da SEFAZ da sua UF e
+    marque a confirmação no fim do formulário. {{ orientacao }}
+  </div>
+
+  {% if configuracoes %}
+    <section class="panel">
+      <div class="section-heading">
+        <h2>Configurações por documento</h2>
+        <p>Cada modelo, ambiente e série mantém sua própria sequência e rota fiscal.</p>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Modelo</th><th>Ambiente</th><th>Série</th><th>Próximo número</th><th>Rota</th><th class="actions">Ação</th></tr>
+          </thead>
+          <tbody>
+            {% for cfg in configuracoes %}
+              <tr>
+                <td>{{ cfg.modelo_rotulo }}</td>
+                <td>{{ cfg.ambiente_rotulo }}</td>
+                <td>{{ cfg.serie }}</td>
+                <td>{{ "%09d"|format(cfg.proximo_numero) }}</td>
+                <td><span class="code">{{ cfg.provedor }}</span></td>
+                <td class="actions">
+                  <a class="button button-secondary" href="{{ url_for('fiscal.configuracao', empresa_id=empresa.id, modelo=cfg.modelo, ambiente=cfg.ambiente, serie=cfg.serie) }}">Abrir</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="notice">
+        <strong>Importante:</strong> salvar uma combinação torna essa configuração a seleção atual do módulo fiscal.
+        O caixa automático permanece bloqueado para NF-e 55 nesta fase; ele só emite NFC-e 65.
+      </div>
+    </section>
+  {% endif %}
+
+  <form method="post" class="form-panel" novalidate>
+    {{ form.hidden_tag() }}
+
+    <div class="section-heading"><h2>Emitente</h2></div>
+    <div class="form-grid">
+      <div class="field">{{ form.cnpj.label }} {{ form.cnpj(placeholder="00.000.000/0000-00") }}</div>
+      <div class="field">{{ form.razao_social.label }} {{ form.razao_social() }}</div>
+      <div class="field">{{ form.nome_fantasia.label }} {{ form.nome_fantasia() }}</div>
+      <div class="field">{{ form.inscricao_estadual.label }} {{ form.inscricao_estadual() }}</div>
+      <div class="field">{{ form.inscricao_municipal.label }} {{ form.inscricao_municipal() }}</div>
+      <div class="field">{{ form.crt.label }} {{ form.crt() }}</div>
+    </div>
+
+    <div class="section-heading"><h2>Endereço</h2></div>
+    <div class="form-grid">
+      <div class="field">{{ form.logradouro.label }} {{ form.logradouro() }}</div>
+      <div class="field">{{ form.numero.label }} {{ form.numero() }}</div>
+      <div class="field">{{ form.complemento.label }} {{ form.complemento() }}</div>
+      <div class="field">{{ form.bairro.label }} {{ form.bairro() }}</div>
+      <div class="field">
+        {{ form.codigo_municipio.label }} {{ form.codigo_municipio(placeholder="3550308") }}
+        <small class="subline">Sete dígitos do IBGE. Precisa começar com o código da UF.</small>
+      </div>
+      <div class="field">{{ form.municipio.label }} {{ form.municipio() }}</div>
+      <div class="field">{{ form.uf.label }} {{ form.uf(placeholder="SP", maxlength=2) }}</div>
+      <div class="field">{{ form.cep.label }} {{ form.cep() }}</div>
+      <div class="field">{{ form.telefone.label }} {{ form.telefone() }}</div>
+    </div>
+
+    <div class="section-heading"><h2>Documento e numeração</h2></div>
+    <div class="form-grid">
+      <div class="field">{{ form.modelo.label }} {{ form.modelo() }}</div>
+      <div class="field">{{ form.serie.label }} {{ form.serie() }}</div>
+      <div class="field">
+        {{ form.proximo_numero.label }} {{ form.proximo_numero() }}
+        <small class="subline">A numeração nunca pode retroceder: chave duplicada é rejeição certa.</small>
+      </div>
+      <div class="field">{{ form.ambiente.label }} {{ form.ambiente() }}</div>
+      <div class="field">{{ form.natureza_operacao.label }} {{ form.natureza_operacao() }}</div>
+      <div class="field">{{ form.informacoes_complementares.label }} {{ form.informacoes_complementares(rows=2) }}</div>
+    </div>
+
+    <div class="section-heading"><h2>Rota de emissão</h2></div>
+    <div class="form-grid">
+      <div class="field">{{ form.provedor.label }} {{ form.provedor() }}</div>
+      <div class="field">{{ form.csc_id.label }} {{ form.csc_id(placeholder="000001") }}</div>
+      <div class="field">{{ form.url_consulta_qrcode.label }} {{ form.url_consulta_qrcode(placeholder="https://…") }}</div>
+      <div class="field">{{ form.url_consulta_chave.label }} {{ form.url_consulta_chave(placeholder="https://…") }}</div>
+    </div>
+
+    <div class="section-heading">
+      <h2>SEFAZ direto</h2>
+      <p>Preencha quando a rota escolhida for a transmissão direta com certificado A1.</p>
+    </div>
+    <div class="form-grid">
+      <div class="field">{{ form.url_autorizacao.label }} {{ form.url_autorizacao() }}</div>
+      <div class="field">{{ form.url_evento.label }} {{ form.url_evento() }}</div>
+      <div class="field">{{ form.url_inutilizacao.label }} {{ form.url_inutilizacao() }}</div>
+      <div class="field">{{ form.url_consulta.label }} {{ form.url_consulta() }}</div>
+      <div class="field">{{ form.url_status.label }} {{ form.url_status() }}</div>
+      <div class="field">
+        {{ form.certificado_caminho.label }} {{ form.certificado_caminho(placeholder="/certificados/bigjhow.pfx") }}
+        <small class="subline">Caminho do arquivo no servidor. O certificado nunca é gravado no banco.</small>
+      </div>
+    </div>
+
+    <div class="section-heading">
+      <h2>Ponte com o emissor TPA</h2>
+      <p>Preencha quando a emissão continuar saindo pelo emissor que já roda na loja.</p>
+    </div>
+    <div class="form-grid">
+      <div class="field">{{ form.emissor_host.label }} {{ form.emissor_host(placeholder="192.0.2.10") }}</div>
+      <div class="field">{{ form.emissor_porta.label }} {{ form.emissor_porta(placeholder="8001") }}</div>
+      <div class="field">{{ form.pasta_envio.label }} {{ form.pasta_envio() }}</div>
+      <div class="field">{{ form.pasta_retorno.label }} {{ form.pasta_retorno() }}</div>
+      <div class="field">
+        {{ form.padrao_sucesso.label }} {{ form.padrao_sucesso(placeholder="^\\s*0\\s*\\|") }}
+        <small class="subline">Expressão que identifica resposta de sucesso do emissor.</small>
+      </div>
+    </div>
+
+    <div class="section-heading"><h2>Gateway de terceiro</h2></div>
+    <div class="form-grid">
+      <div class="field">{{ form.url_base.label }} {{ form.url_base(placeholder="https://api.exemplo.com.br") }}</div>
+      <div class="field">{{ form.estilo_autenticacao.label }} {{ form.estilo_autenticacao() }}</div>
+    </div>
+
+    <div class="section-heading">
+      <h2>Responsável técnico</h2>
+      <p>Obrigatório na NF-e e na NFC-e desde a Nota Técnica 2018.005.</p>
+    </div>
+    <div class="form-grid">
+      <div class="field">{{ form.responsavel_cnpj.label }} {{ form.responsavel_cnpj() }}</div>
+      <div class="field">{{ form.responsavel_contato.label }} {{ form.responsavel_contato() }}</div>
+      <div class="field">{{ form.responsavel_email.label }} {{ form.responsavel_email() }}</div>
+      <div class="field">{{ form.responsavel_telefone.label }} {{ form.responsavel_telefone() }}</div>
+    </div>
+
+    <div class="section-heading"><h2>Liberação</h2></div>
+    <div class="checkbox-group">
+      <label class="check-field">{{ form.enderecos_conferidos() }} <span>{{ form.enderecos_conferidos.label.text }}</span></label>
+      <label class="check-field">{{ form.permitir_contingencia() }} <span>{{ form.permitir_contingencia.label.text }}</span></label>
+      <label class="check-field">{{ form.emissao_ativa() }} <span>{{ form.emissao_ativa.label.text }}</span></label>
+    </div>
+
+    <div class="form-actions">
+      {{ form.submit(class="button button-primary") }}
+      <a class="button button-secondary" href="{{ url_for('fiscal.painel', empresa_id=empresa.id) }}">Cancelar</a>
+    </div>
+  </form>
+
+  <section class="panel">
+    <div class="section-heading">
+      <h2>Credenciais</h2>
+      <p>Guardadas cifradas com AES-GCM. O valor não volta a ser exibido; só a dica final.</p>
+    </div>
+    {% if not chave_configurada %}
+      <div class="notice"><strong>Defina FISCAL_SECRET_KEY no servidor</strong> antes de cadastrar credenciais.</div>
+    {% endif %}
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Credencial</th><th>Guardada</th><th class="actions">Ações</th></tr></thead>
+        <tbody>
+          {% for nome, rotulo in [('csc_token', 'CSC (token) da NFC-e'), ('certificado_senha', 'Senha do certificado A1'), ('gateway_token', 'Token do gateway')] %}
+            <tr>
+              <td>{{ rotulo }}</td>
+              <td>{% if nome in credenciais %}<span class="code">{{ credenciais[nome] }}</span>{% else %}<span class="badge badge-muted">não cadastrada</span>{% endif %}</td>
+              <td class="actions">
+                {% if nome in credenciais %}
+                  <form method="post" action="{{ url_for('fiscal.excluir_credencial', empresa_id=empresa.id, nome=nome) }}">
+                    {{ acao_form.hidden_tag() }}
+                    <button class="button button-subtle-danger" type="submit">Remover</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <form method="post" action="{{ url_for('fiscal.salvar_credencial', empresa_id=empresa.id) }}" class="stacked-form">
+      {{ credencial_form.hidden_tag() }}
+      <div class="form-grid">
+        <div class="field">{{ credencial_form.nome.label }} {{ credencial_form.nome() }}</div>
+        <div class="field">{{ credencial_form.valor.label }} {{ credencial_form.valor(type="password", autocomplete="off") }}</div>
+      </div>
+      <div class="form-actions">{{ credencial_form.submit(class="button button-primary") }}</div>
+    </form>
+  </section>
+{% endblock %}

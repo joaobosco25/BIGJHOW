@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Documentos fiscais · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <div>
+      <span class="eyebrow">FISCAL / DOCUMENTOS</span>
+      <h1>Documentos fiscais</h1>
+      <p>Todo XML emitido, com status, protocolo e trilha de tentativas.</p>
+    </div>
+    <a class="back-link" href="{{ url_for('fiscal.painel', empresa_id=empresa.id) }}">← Voltar ao painel fiscal</a>
+  </section>
+
+  <section class="panel">
+    <div class="toolbar">
+      <nav class="filter-tabs" aria-label="Filtrar por situação">
+        <a class="{% if not status %}selected{% endif %}" href="{{ url_for('fiscal.documentos', empresa_id=empresa.id) }}">Todos</a>
+        {% for chave, rotulo in [('autorizado','Autorizados'), ('pendente','Pendentes'), ('contingencia','Contingência'), ('rejeitado','Rejeitados'), ('cancelado','Cancelados')] %}
+          <a class="{% if status == chave %}selected{% endif %}" href="{{ url_for('fiscal.documentos', empresa_id=empresa.id, status=chave) }}">{{ rotulo }}</a>
+        {% endfor %}
+      </nav>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Número</th><th>Chave</th><th>Emissão</th><th class="number">Total</th><th>Status</th><th class="actions">Ações</th></tr></thead>
+        <tbody>
+          {% for documento in documentos %}
+            <tr>
+              <td><span class="code">{{ documento.numero_formatado }}</span><small class="subline">série {{ documento.serie }}</small></td>
+              <td><span class="code">{{ documento.chave }}</span></td>
+              <td>{{ documento.data_emissao|data_hora }}</td>
+              <td class="number">{{ documento.total_documento|brl }}</td>
+              <td>
+                {% if documento.status == 'autorizado' and not documento.sem_valor_fiscal %}
+                  <span class="badge badge-success">{{ documento.status_rotulo }}</span>
+                {% elif documento.status in ['rejeitado', 'denegado', 'falhou'] %}
+                  <span class="badge badge-danger">{{ documento.status_rotulo }}</span>
+                {% else %}
+                  <span class="badge badge-warning">{{ documento.status_rotulo }}</span>
+                {% endif %}
+              </td>
+              <td class="actions">
+                <a class="button button-subtle" href="{{ url_for('fiscal.documento_detalhe', empresa_id=empresa.id, documento_id=documento.id) }}">Abrir</a>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6"><div class="empty-state"><p>Nenhum documento nesta situação.</p></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

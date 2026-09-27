@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Inutilizações · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <div>
+      <span class="eyebrow">FISCAL / NUMERAÇÃO</span>
+      <h1>Inutilização de numeração</h1>
+      <p>Número de nota que a SEFAZ nunca autorizou e que também nunca foi inutilizado vira pendência fiscal.</p>
+    </div>
+    <a class="back-link" href="{{ url_for('fiscal.painel', empresa_id=empresa.id) }}">← Voltar ao painel fiscal</a>
+  </section>
+
+  <section class="panel">
+    <div class="toolbar">
+      <div class="section-heading">
+        <h2>Lacunas na sequência</h2>
+        <p>A varredura repete a regra que o sistema antigo já usava: dentro da janela das últimas notas autorizadas, todo número sem documento é candidato.</p>
+      </div>
+      <form method="post" action="{{ url_for('fiscal.detectar', empresa_id=empresa.id) }}">
+        {{ acao_form.hidden_tag() }}
+        <button class="button button-secondary" type="submit">Varrer numeração</button>
+      </form>
+    </div>
+    {% if faixas %}
+      <ul class="detail-list">
+        {% for inicio, fim in faixas %}
+          <li>
+            <span>Faixa pendente</span>
+            <strong>{% if inicio == fim %}nº {{ inicio }}{% else %}nº {{ inicio }} a {{ fim }} ({{ fim - inicio + 1 }} números){% endif %}</strong>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="empty-state"><p>Nenhuma faixa pendente de inutilização.</p></div>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <h2>Inutilizar uma faixa</h2>
+      <p>A SEFAZ recusa a inutilização se algum número da faixa já tiver documento autorizado — o sistema confere isso antes de enviar.</p>
+    </div>
+    <form method="post" action="{{ url_for('fiscal.executar_inutilizacao', empresa_id=empresa.id) }}" class="stacked-form">
+      {{ inutilizar_form.hidden_tag() }}
+      <div class="form-grid">
+        <div class="field">{{ inutilizar_form.numero_inicial.label }} {{ inutilizar_form.numero_inicial() }}</div>
+        <div class="field">{{ inutilizar_form.numero_final.label }} {{ inutilizar_form.numero_final() }}</div>
+      </div>
+      <div class="field">{{ inutilizar_form.justificativa.label }} {{ inutilizar_form.justificativa(rows=3) }}</div>
+      <div class="form-actions">{{ inutilizar_form.submit(class="button button-danger") }}</div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading"><h2>Histórico</h2></div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Série</th><th>Número</th><th>Status</th><th>Protocolo</th><th>Origem</th><th>Detectado</th></tr></thead>
+        <tbody>
+          {% for registro in registros %}
+            <tr>
+              <td>{{ registro.serie }}</td>
+              <td><span class="code">{{ registro.numero }}</span></td>
+              <td>
+                {% if registro.status == 'autorizada' %}
+                  <span class="badge badge-success">{{ registro.status_rotulo }}</span>
+                {% elif registro.status == 'rejeitada' %}
+                  <span class="badge badge-danger">{{ registro.status_rotulo }}</span>
+                {% else %}
+                  <span class="badge badge-warning">{{ registro.status_rotulo }}</span>
+                {% endif %}
+              </td>
+              <td>{{ registro.protocolo or '—' }}</td>
+              <td>{{ registro.origem }}</td>
+              <td>{{ registro.detectado_em|data_hora }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6"><div class="empty-state"><p>Nenhum registro.</p></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

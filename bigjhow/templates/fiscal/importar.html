@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Importar acervo fiscal · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <div>
+      <span class="eyebrow">FISCAL / ACERVO</span>
+      <h1>Importar acervo do sistema antigo</h1>
+      <p>Lê os mesmos formatos que o integrador do TPA lia: nfeProc, procEventoNFe e ProcInutNFe.</p>
+    </div>
+    <a class="back-link" href="{{ url_for('fiscal.painel', empresa_id=empresa.id) }}">← Voltar ao painel fiscal</a>
+  </section>
+
+  <div class="notice">
+    O XML autorizado precisa ser guardado por cinco anos. Traga o acervo do
+    servidor da loja para cá antes de desligar a máquina antiga. Documentos já
+    importados são reconhecidos pela chave e não entram duas vezes.
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="form-panel">
+    {{ form.hidden_tag() }}
+    <div class="field">
+      <label for="arquivos">Arquivos XML</label>
+      <input id="arquivos" name="arquivos" type="file" accept=".xml,text/xml,application/xml" multiple>
+      <small class="subline">Selecione um ou vários arquivos de uma vez.</small>
+    </div>
+    <div class="field">
+      {{ form.pasta.label }} {{ form.pasta(placeholder="/var/bigjhow/acervo-xml") }}
+      <small class="subline">Alternativa: caminho de uma pasta já copiada para o servidor.</small>
+    </div>
+    <div class="form-actions">{{ form.submit(class="button button-primary") }}</div>
+  </form>
+
+  {% if resultado %}
+    <section class="panel">
+      <div class="section-heading"><h2>Resultado</h2></div>
+      <ul class="detail-list">
+        <li><span>Documentos importados</span><strong>{{ resultado.importados }}</strong></li>
+        <li><span>Cancelamentos aplicados</span><strong>{{ resultado.cancelamentos }}</strong></li>
+        <li><span>Inutilizações registradas</span><strong>{{ resultado.inutilizacoes }}</strong></li>
+        <li><span>Ignorados (já existentes)</span><strong>{{ resultado.ignorados }}</strong></li>
+      </ul>
+      {% if resultado.erros %}
+        <div class="section-heading"><h3>Arquivos com problema</h3></div>
+        <ul class="detail-list">
+          {% for erro in resultado.erros[:50] %}<li><span>Erro</span><strong>{{ erro }}</strong></li>{% endfor %}
+        </ul>
+      {% endif %}
+    </section>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Histórico do caixa · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <div>
+      <a class="back-link" href="{{ url_for('operacao.painel', empresa_id=empresa.id) }}">← Voltar ao caixa</a>
+      <span class="eyebrow">{{ empresa.nome|upper }} / CONFERÊNCIA DIÁRIA</span>
+      <h1>Histórico do caixa</h1>
+      <p>Cada bloco reúne vendas, meios de pagamento, entradas, saídas e troco do turno.</p>
+    </div>
+  </section>
+
+  <div class="shift-history">
+    {% for dia in dias %}
+      <section class="shift-day" aria-labelledby="dia-{{ loop.index }}">
+        <header><span class="eyebrow">DIA</span><h2 id="dia-{{ loop.index }}">{{ dia.data }}</h2></header>
+        <div class="shift-day-list">
+          {% for registro in dia.turnos %}
+            {% set turno = registro.turno %}
+            {% set resumo = registro.resumo %}
+            <article class="panel shift-summary-card">
+              <header class="shift-summary-header">
+                <div><span class="turno-live-indicator"><i></i> {{ turno.status_rotulo|upper }}</span><h3>{{ turno.terminal.codigo }} · {{ turno.terminal.nome }}</h3><p>{{ turno.operador.nome if turno.operador else 'Usuário removido' }} · {{ turno.aberto_em|data_hora }}{% if turno.fechado_em %} até {{ turno.fechado_em|data_hora }}{% endif %}</p></div>
+                <div class="shift-summary-total"><span>Total vendido</span><strong>{{ resumo.total_vendas|brl if turno.status == 'fechado' else 'Oculto' }}</strong><small>{{ resumo.vendas_finalizadas }} venda(s) · {{ resumo.vendas_canceladas }} cancelada(s){% if turno.status == 'aberto' %} · liberado após fechar{% endif %}</small></div>
+              </header>
+
+              <div class="shift-payment-grid" aria-label="Formas de pagamento">
+                <div><span>Dinheiro líquido</span><strong>{{ resumo.dinheiro_vendas|brl if turno.status == 'fechado' else '—' }}</strong></div>
+                <div><span>PIX</span><strong>{{ resumo.pix|brl if turno.status == 'fechado' else '—' }}</strong></div>
+                <div><span>Débito</span><strong>{{ resumo.debito|brl if turno.status == 'fechado' else '—' }}</strong></div>
+                <div><span>Crédito</span><strong>{{ resumo.credito|brl if turno.status == 'fechado' else '—' }}</strong></div>
+              </div>
+
+              <div class="shift-cash-flow" aria-label="Movimentação do dinheiro físico">
+                <div><span>Fundo inicial</span><strong>{{ turno.valor_inicial|brl }}</strong><small>dinheiro para troco</small></div>
+                <div><span>Dinheiro recebido</span><strong>{{ resumo.dinheiro_recebido|brl if turno.status == 'fechado' else '—' }}</strong><small>valor entregue pelos clientes</small></div>
+                <div><span>Troco entregue</span><strong>{{ ('- ' ~ (resumo.troco|brl)) if turno.status == 'fechado' else '—' }}</strong><small>dinheiro devolvido</small></div>
+                <div><span>Suprimentos</span><strong>{{ ('+ ' ~ (resumo.suprimentos|brl)) if turno.status == 'fechado' else '—' }}</strong><small>dinheiro acrescentado</small></div>
+                <div><span>Sangrias</span><strong>{{ ('- ' ~ (resumo.sangrias|brl)) if turno.status == 'fechado' else '—' }}</strong><small>dinheiro retirado</small></div>
+                <div class="shift-cash-expected"><span>Esperado na gaveta</span><strong>{{ resumo.dinheiro|brl if turno.status == 'fechado' else 'Oculto' }}</strong><small>{{ 'cálculo do servidor' if turno.status == 'fechado' else 'visível após a contagem' }}</small></div>
+              </div>
+
+              <footer class="shift-summary-footer">
+                {% if turno.status == 'fechado' %}
+                  <span>Diferença no dinheiro: <strong>{{ turno.dinheiro_diferenca|brl }}</strong></span>
+                {% else %}
+                  <span>Turno ainda em operação</span>
+                {% endif %}
+                <a class="button button-secondary" href="{{ url_for('operacao.detalhe_turno', empresa_id=empresa.id, turno_id=turno.id) }}">Ver detalhes</a>
+              </footer>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    {% else %}
+      <section class="panel empty-state">Nenhum turno registrado nesta empresa.</section>
+    {% endfor %}
+  </div>
+{% endblock %}

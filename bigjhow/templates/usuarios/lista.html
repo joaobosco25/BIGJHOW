@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Usuários{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <div>
+      <span class="eyebrow">ACESSO E PERMISSÕES</span>
+      <h1>Usuários</h1>
+      <p>
+        {% if current_user.papel == 'proprietario' %}
+          Gerencie contas individuais, perfis e empresas autorizadas.
+        {% else %}
+          Gerencie somente operadores vinculados às suas empresas.
+        {% endif %}
+      </p>
+    </div>
+    <a class="button button-primary" href="{{ url_for('usuarios.novo') }}">+ Novo usuário</a>
+  </section>
+
+  <section class="panel">
+    <div class="toolbar">
+      <form method="get" class="search-form">
+        <label class="sr-only" for="q">Buscar usuário</label>
+        <input id="q" name="q" value="{{ busca }}" maxlength="120" placeholder="Buscar por nome ou usuário">
+        <input type="hidden" name="situacao" value="{{ situacao }}">
+        <button class="button button-secondary" type="submit">Buscar</button>
+      </form>
+      <nav class="filter-tabs" aria-label="Filtrar usuários">
+        <a class="{% if situacao == 'todos' %}selected{% endif %}" href="{{ url_for('usuarios.lista', q=busca, situacao='todos') }}">Todos</a>
+        <a class="{% if situacao == 'ativos' %}selected{% endif %}" href="{{ url_for('usuarios.lista', q=busca, situacao='ativos') }}">Ativos</a>
+        <a class="{% if situacao == 'inativos' %}selected{% endif %}" href="{{ url_for('usuarios.lista', q=busca, situacao='inativos') }}">Inativos</a>
+        <a class="{% if situacao == 'bloqueados' %}selected{% endif %}" href="{{ url_for('usuarios.lista', q=busca, situacao='bloqueados') }}">Bloqueados</a>
+      </nav>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Usuário</th>
+            <th>Perfil</th>
+            <th>Empresas autorizadas</th>
+            <th>Último acesso</th>
+            <th>Status</th>
+            <th class="actions">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in usuarios.items %}
+            <tr>
+              <td>
+                <strong>{{ item.nome }}</strong>
+                <small class="subline">@{{ item.usuario }}</small>
+              </td>
+              <td>{{ item.papel_rotulo }}</td>
+              <td>
+                {% if item.papel == 'proprietario' %}
+                  <span class="badge badge-success">Todas as empresas</span>
+                {% else %}
+                  <div class="badges">
+                    {% for vinculo in item.empresas %}<span class="badge badge-muted">{{ vinculo.empresa.nome }}</span>{% endfor %}
+                  </div>
+                {% endif %}
+              </td>
+              <td>{{ item.ultimo_login_em|data_hora if item.ultimo_login_em else 'Nunca acessou' }}</td>
+              <td>
+                <div class="badges">
+                  {% if not item.ativo %}
+                    <span class="badge badge-danger">Inativo</span>
+                  {% elif item.bloqueio_ativo() %}
+                    <span class="badge badge-warning">Bloqueado</span>
+                  {% elif item.troca_senha_obrigatoria %}
+                    <span class="badge badge-warning">Troca de senha</span>
+                  {% else %}
+                    <span class="badge badge-success">Ativo</span>
+                  {% endif %}
+                </div>
+              </td>
+              <td class="actions actions-wrap">
+                <a href="{{ url_for('usuarios.editar', usuario_id=item.id) }}">Editar</a>
+                {% if item.id != current_user.id %}
+                  <a href="{{ url_for('usuarios.redefinir_senha', usuario_id=item.id) }}">Redefinir senha</a>
+                  <form method="post" action="{{ url_for('usuarios.alterar_status', usuario_id=item.id) }}" data-confirm="{% if item.ativo %}Desativar este usuário e encerrar suas sessões?{% else %}Reativar este usuário?{% endif %}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="versao" value="{{ item.versao }}">
+                    <button type="submit" class="{% if item.ativo %}link-danger{% endif %}">{% if item.ativo %}Desativar{% else %}Ativar{% endif %}</button>
+                  </form>
+                {% endif %}
+                {% if item.bloqueio_ativo() %}
+                  <form method="post" action="{{ url_for('usuarios.desbloquear', usuario_id=item.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="versao" value="{{ item.versao }}">
+                    <button type="submit">Desbloquear</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="empty-state">Nenhum usuário encontrado com esses filtros.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if usuarios.pages > 1 %}
+      <nav class="pagination" aria-label="Paginação">
+        {% if usuarios.has_prev %}<a href="{{ url_for('usuarios.lista', q=busca, situacao=situacao, page=usuarios.prev_num) }}">← Anterior</a>{% endif %}
+        <span>Página {{ usuarios.page }} de {{ usuarios.pages }} · {{ usuarios.total }} resultados</span>
+        {% if usuarios.has_next %}<a href="{{ url_for('usuarios.lista', q=busca, situacao=situacao, page=usuarios.next_num) }}">Próxima →</a>{% endif %}
+      </nav>
+    {% endif %}
+  </section>
+{% endblock %}

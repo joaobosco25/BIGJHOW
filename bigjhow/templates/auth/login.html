@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Acesso seguro · Big Jhow Gestão</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body class="login-page">
+  <main class="login-shell">
+    <section class="login-brand" aria-label="Big Jhow Gestão">
+      <div class="brand brand-large">
+        <span class="brand-mark" aria-hidden="true">BJ</span>
+        <span><strong>BIG JHOW</strong><small>GESTÃO</small></span>
+      </div>
+      <div class="login-message">
+        <span class="gold-line"></span>
+        <p>Controle central. Operações separadas. Decisões seguras.</p>
+      </div>
+      <div class="company-list">
+        <span>BIG JHOW CARNES</span><span>STEAK HOUSE</span><span>BIG JHOW SUSHI</span>
+      </div>
+    </section>
+    <section class="login-panel">
+      <div class="login-card">
+        <span class="eyebrow">AMBIENTE ADMINISTRATIVO</span>
+        <h1>Bem-vindo de volta</h1>
+        <p>Use suas credenciais para acessar o painel.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% for category, message in messages %}
+            <div class="flash flash-{{ category }}" aria-live="polite">{{ message }}</div>
+          {% endfor %}
+        {% endwith %}
+
+        <form method="post" class="form-stack" novalidate>
+          {{ form.hidden_tag() }}
+          <div class="field">
+            {{ form.usuario.label }}
+            {{ form.usuario(autocomplete='username', autocapitalize='none', spellcheck='false', placeholder='seu.usuario', autofocus=true) }}
+            {% for error in form.usuario.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+          </div>
+          <div class="field">
+            {{ form.senha.label }}
+            {{ form.senha(autocomplete='current-password', placeholder='Sua senha') }}
+            {% for error in form.senha.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+          </div>
+          {{ form.submit(class='button button-primary button-full') }}
+        </form>
+        <div class="security-note"><span aria-hidden="true">◆</span> Sessão protegida e ações auditadas</div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

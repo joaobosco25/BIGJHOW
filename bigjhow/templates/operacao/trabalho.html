@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Impressão simulada · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="page-header"><div><span class="eyebrow">TRABALHO {{ trabalho.id }}</span><h1>{{ trabalho.evento }}</h1><p>{{ trabalho.impressora.nome }} · {{ trabalho.impressora.setor }} · {{ trabalho.copias }} cópia(s)</p></div><span class="badge {{ 'badge-success' if trabalho.status == 'impresso' else ('badge-danger' if trabalho.status == 'falhou' else 'badge-warning') }}">{{ trabalho.status_rotulo }}</span></section>
+  <section class="metric-grid"><article class="metric-card"><span>Terminal</span><strong>{{ trabalho.terminal.codigo }}</strong><small>{{ trabalho.terminal.nome }}</small></article><article class="metric-card"><span>Tentativas</span><strong>{{ trabalho.tentativas }}</strong><small>contador preservado</small></article><article class="metric-card"><span>Versão</span><strong>{{ trabalho.versao }}</strong><small>proteção concorrente</small></article><article class="metric-card"><span>Modo</span><strong>Simulado</strong><small>sem acesso ao hardware</small></article></section>
+  {% if trabalho.erro_mensagem %}<div class="flash flash-erro">{{ trabalho.erro_codigo }} · {{ trabalho.erro_mensagem }}</div>{% endif %}
+  <section class="operation-grid">
+    <article class="panel"><span class="eyebrow">CONTEÚDO IMUTÁVEL</span><h2>Resumo do payload</h2><dl class="detail-list">{% for chave, valor in trabalho.payload.items() %}<div><dt>{{ chave }}</dt><dd>{{ valor }}</dd></div>{% endfor %}</dl></article>
+    <article class="panel">
+      <span class="eyebrow">AÇÕES CONTROLADAS</span><h2>Simulador</h2>
+      {% if trabalho.status == 'pendente' %}
+        <form method="post" action="{{ url_for('operacao.imprimir', empresa_id=empresa.id, trabalho_id=trabalho.id) }}">{{ imprimir_form.hidden_tag() }}<button class="button button-primary" type="submit">Simular impressão concluída</button></form>
+      {% endif %}
+      {% if current_user.papel in ['proprietario', 'administrador'] and trabalho.status == 'pendente' %}
+        <form method="post" action="{{ url_for('operacao.falhar', empresa_id=empresa.id, trabalho_id=trabalho.id) }}">{{ falhar_form.hidden_tag() }}<button class="button button-danger" type="submit">Simular falta de papel</button></form>
+      {% endif %}
+      {% if current_user.papel in ['proprietario', 'administrador'] and trabalho.status == 'falhou' %}
+        <form method="post" action="{{ url_for('operacao.reprocessar', empresa_id=empresa.id, trabalho_id=trabalho.id) }}">{{ reprocessar_form.hidden_tag() }}<button class="button button-secondary" type="submit">Voltar para pendente</button></form>
+      {% endif %}
+      {% if current_user.papel in ['proprietario', 'administrador'] and trabalho.status == 'impresso' %}
+        <form method="post" action="{{ url_for('operacao.reimprimir', empresa_id=empresa.id, trabalho_id=trabalho.id) }}" class="stacked-form">{{ reimpressao_form.hidden_tag() }}<div class="field">{{ reimpressao_form.motivo.label }}{{ reimpressao_form.motivo(rows='3') }}</div>{{ reimpressao_form.submit(class='button button-secondary') }}</form>
+      {% endif %}
+    </article>
+  </section>
+{% endblock %}

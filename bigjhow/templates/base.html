@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>{% block title %}Gestão{% endblock %} · Big Jhow</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</head>
+<body class="{% if current_user.is_authenticated and current_user.papel == 'operador' %}operator-shell{% endif %}{% if request.endpoint in ['operacao.painel', 'operacao.detalhe_turno'] %} cashier-screen{% endif %}">
+  <div class="app-shell">
+    {% if not (current_user.is_authenticated and current_user.papel == 'operador') %}
+      <aside class="sidebar" id="sidebar" aria-label="Navegação principal">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">BJ</span>
+          <span><strong>BIG JHOW</strong><small>GESTÃO</small></span>
+        </div>
+
+        <div class="context-box">
+          <span class="eyebrow">CONTEXTO ATUAL</span>
+          <details class="company-switcher">
+            <summary>
+              <span>
+                <small>{% if empresa is defined %}Empresa{% else %}Grupo{% endif %}</small>
+                <strong>{% if empresa is defined %}{{ empresa.nome }}{% else %}Visão Geral do Grupo{% endif %}</strong>
+              </span>
+              <span aria-hidden="true">⌄</span>
+            </summary>
+            <div class="company-options">
+              <a href="{{ url_for('grupo.visao_geral') }}">Visão Geral do Grupo</a>
+              {% for item in empresas_menu %}
+                <a href="{{ url_for('operacao.painel', empresa_id=item.id) if current_user.papel == 'operador' else url_for('estoque.lista', empresa_id=item.id) }}">{{ item.nome }}</a>
+              {% endfor %}
+            </div>
+          </details>
+        </div>
+
+        <nav class="main-nav">
+          <a class="nav-item {% if request.blueprint == 'grupo' %}active{% endif %}" href="{{ url_for('grupo.visao_geral') }}">
+            <span class="nav-icon">◫</span><span>Visão do grupo</span>
+          </a>
+          {% if empresa is defined %}
+            <a class="nav-item {% if request.blueprint == 'estoque' %}active{% endif %}" href="{{ url_for('estoque.lista', empresa_id=empresa.id) }}">
+              <span class="nav-icon">▦</span><span>Estoque</span>
+            </a>
+            <a class="nav-item {% if request.blueprint in ['caixa', 'operacao'] %}active{% endif %}" href="{{ url_for('operacao.painel', empresa_id=empresa.id) }}">
+              <span class="nav-icon">▣</span><span>Caixa</span>
+            </a>
+            {% if current_user.papel in ['proprietario', 'administrador'] %}
+              <a class="nav-item {% if request.blueprint == 'inventario' %}active{% endif %}" href="{{ url_for('inventario.lista', empresa_id=empresa.id) }}">
+                <span class="nav-icon">✓</span><span>Inventário em lote</span>
+              </a>
+              <a class="nav-item {% if request.blueprint == 'fiscal' %}active{% endif %}" href="{{ url_for('fiscal.painel', empresa_id=empresa.id) }}">
+                <span class="nav-icon">§</span><span>Fiscal</span>
+              </a>
+              <a class="nav-item {% if request.blueprint == 'balanca' %}active{% endif %}" href="{{ url_for('balanca.configuracao', empresa_id=empresa.id) }}">
+                <span class="nav-icon">⚖</span><span>Balança</span>
+              </a>
+            {% endif %}
+          {% else %}
+            <span class="nav-item disabled"><span class="nav-icon">▦</span><span>Estoque</span><small>selecione</small></span>
+          {% endif %}
+          <span class="nav-item disabled"><span class="nav-icon">⌁</span><span>Dashboard</span><small>em breve</small></span>
+          <span class="nav-item disabled"><span class="nav-icon">₿</span><span>Relatórios de vendas</span><small>em breve</small></span>
+          <span class="nav-item disabled"><span class="nav-icon">＋</span><span>Compras</span><small>em breve</small></span>
+          <span class="nav-item disabled"><span class="nav-icon">▤</span><span>Financeiro</span><small>em breve</small></span>
+          <span class="nav-item disabled"><span class="nav-icon">%</span><span>CMV e perdas</span><small>em breve</small></span>
+          <span class="nav-item disabled"><span class="nav-icon">↗</span><span>Relatórios</span><small>em breve</small></span>
+          {% if current_user.papel in ['proprietario', 'administrador'] %}
+            <a class="nav-item {% if request.blueprint == 'usuarios' %}active{% endif %}" href="{{ url_for('usuarios.lista') }}">
+              <span class="nav-icon">♙</span><span>Usuários</span>
+            </a>
+          {% endif %}
+          {% if current_user.papel == 'proprietario' %}
+            <a class="nav-item {% if request.blueprint == 'auditoria' %}active{% endif %}" href="{{ url_for('auditoria.lista') }}">
+              <span class="nav-icon">◉</span><span>Auditoria</span>
+            </a>
+          {% endif %}
+        </nav>
+
+        <div class="sidebar-footer">
+          {% if current_user.is_authenticated %}
+            <div class="user-card">
+              <span class="avatar">{{ current_user.nome[:1]|upper }}</span>
+              <span><strong>{{ current_user.nome }}</strong><small>{{ current_user.papel_rotulo }}</small></span>
+            </div>
+            <a class="account-link" href="{{ url_for('auth.trocar_senha') }}">Alterar minha senha</a>
+            <form method="post" action="{{ url_for('auth.logout') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="logout-button">Encerrar sessão</button>
+            </form>
+          {% else %}
+            <a class="logout-button" href="{{ url_for('auth.login') }}">Entrar</a>
+          {% endif %}
+        </div>
+      </aside>
+
+      <div class="sidebar-backdrop" data-sidebar-close></div>
+    {% endif %}
+
+    <main class="main-content">
+      {% if current_user.is_authenticated and current_user.papel == 'operador' and request.endpoint in ['operacao.painel', 'operacao.detalhe_turno'] and empresa is defined %}
+        <header class="cashier-topbar" aria-label="Barra do caixa">
+          <div class="cashier-brand-wrap">
+            {% if empresa.nome == 'Big Jhow Carnes' %}
+              <img class="cashier-brand-image" src="{{ url_for('static', filename='img/caixa-brand-carnes.jpg') }}" alt="Big Jhow Carnes — Qualidade em cada corte">
+            {% else %}
+              <div class="cashier-brand-fallback"><span class="brand-mark">BJ</span><span><strong>{{ empresa.nome|upper }}</strong><small>BIG JHOW GESTÃO</small></span></div>
+            {% endif %}
+          </div>
+
+          <div class="cashier-operating-context">
+            <span class="status-dot"></span>
+            <span>Operando em</span>
+            <strong>{{ empresa.nome }}</strong>
+          </div>
+
+          <div class="cashier-topbar-spacer"></div>
+
+          <div class="cashier-topbar-item cashier-security-item">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 19 6v5c0 4.7-2.8 8.2-7 10-4.2-1.8-7-5.3-7-10V6l7-3Z"/><path d="m9.5 12 1.7 1.7 3.6-4"/></svg>
+            <span>Sessão protegida</span>
+          </div>
+
+          {% set nome_partes = current_user.nome.split() %}
+          <details class="cashier-account-menu">
+            <summary class="cashier-topbar-item cashier-operator-item">
+              <span class="cashier-avatar">{{ nome_partes[0][0]|upper }}{% if nome_partes|length > 1 %}{{ nome_partes[-1][0]|upper }}{% endif %}</span>
+              <span><small>Operador</small><strong>{{ current_user.nome }}</strong></span>
+            </summary>
+            <div class="cashier-account-dropdown">
+              <a href="{{ url_for('auth.trocar_senha') }}">Alterar minha senha</a>
+              <form method="post" action="{{ url_for('auth.logout') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit">Encerrar sessão</button>
+              </form>
+            </div>
+          </details>
+
+          {% if turno %}
+            <details class="cashier-terminal-menu">
+              <summary class="cashier-topbar-item cashier-terminal-item" aria-label="Opções do caixa {{ turno.terminal.codigo }}">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h10M7 15h3M14 15h3"/></svg>
+                <span><small>Caixa</small><strong>{{ turno.terminal.codigo }}</strong></span>
+                <span class="cashier-terminal-chevron" aria-hidden="true">⌄</span>
+              </summary>
+              <div class="cashier-terminal-dropdown" aria-label="Ações do caixa">
+                <div class="cashier-terminal-dropdown-head">
+                  <span class="status-dot"></span>
+                  <span><small>Caixa aberto</small><strong>{{ turno.terminal.codigo }}</strong></span>
+                </div>
+                <a href="{{ url_for('operacao.detalhe_turno', empresa_id=empresa.id, turno_id=turno.id) }}#movimentacao-caixa">
+                  <span class="cashier-terminal-action-icon" aria-hidden="true">↕</span>
+                  <span><strong>Inserir sangria</strong><small>Retirar dinheiro do caixa com motivo registrado.</small></span>
+                </a>
+                <a class="cashier-terminal-close-action" href="{{ url_for('operacao.detalhe_turno', empresa_id=empresa.id, turno_id=turno.id) }}#fechamento-caixa">
+                  <span class="cashier-terminal-action-icon" aria-hidden="true">✓</span>
+                  <span><strong>Encerrar caixa</strong><small>Contar os meios de pagamento e finalizar o expediente.</small></span>
+                </a>
+              </div>
+            </details>
+          {% else %}
+            <div class="cashier-topbar-item cashier-terminal-item">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h10M7 15h3M14 15h3"/></svg>
+              <span><small>Caixa</small><strong>—</strong></span>
+            </div>
+          {% endif %}
+
+          <div class="cashier-topbar-item cashier-sale-item">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6z"/><path d="M9 7h6M9 11h6M9 15h4"/></svg>
+            <span><small>Venda atual</small><strong>{% if venda %}#{{ venda.numero_formatado }}{% else %}—{% endif %}</strong></span>
+          </div>
+
+          <div class="cashier-topbar-item cashier-clock-item" data-live-clock>
+            <span><small data-live-date>--/--/----</small><strong data-live-time>--:--</strong></span>
+          </div>
+        </header>
+      {% else %}
+        <header class="topbar">
+          {% if not (current_user.is_authenticated and current_user.papel == 'operador') %}
+            <button class="menu-button" type="button" data-sidebar-open aria-controls="sidebar" aria-expanded="false">
+              <span aria-hidden="true">☰</span><span class="sr-only">Abrir menu</span>
+            </button>
+          {% endif %}
+          <div class="topbar-context">
+            <span class="status-dot"></span>
+            {% if empresa is defined %}Operando em <strong>{{ empresa.nome }}</strong>{% else %}<strong>Grupo Big Jhow</strong>{% endif %}
+          </div>
+          <span class="secure-label">SESSÃO PROTEGIDA</span>
+        </header>
+      {% endif %}
+
+      {% set operador_bloqueado_front = current_user.is_authenticated and current_user.papel == 'operador' and request.endpoint not in ['operacao.painel', 'operacao.detalhe_turno'] and request.blueprint not in ['caixa', 'auth'] %}
+      <div class="page-wrap">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="flash-stack" aria-live="polite">
+              {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+        {% if operador_bloqueado_front %}
+          {% if empresa is defined %}
+            {% set caixa_operador_url = url_for('operacao.painel', empresa_id=empresa.id) %}
+          {% elif empresas_menu %}
+            {% set caixa_operador_url = url_for('operacao.painel', empresa_id=(empresas_menu|first).id) %}
+          {% else %}
+            {% set caixa_operador_url = url_for('index') %}
+          {% endif %}
+          <section class="operator-access-lock" data-operator-lock data-operator-cash-url="{{ caixa_operador_url }}">
+            <span class="status-dot"></span>
+            <div><strong>Acesso do operador restrito ao Caixa</strong><small>Redirecionando para a tela operacional.</small></div>
+            <a class="button button-primary" href="{{ caixa_operador_url }}">Ir para o Caixa</a>
+          </section>
+        {% else %}
+          {% block content %}{% endblock %}
+        {% endif %}
+      </div>
+    </main>
+  </div>
+</body>
+</html>

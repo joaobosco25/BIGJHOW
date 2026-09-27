@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% block title %}Balança · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="ops-hero ops-hero-carnes" aria-labelledby="balanca-titulo">
+    <div class="ops-hero-copy">
+      <span class="eyebrow">OPERAÇÃO / BALANÇA</span>
+      <h1 id="balanca-titulo">Balança</h1>
+      <p>Configure a leitura da etiqueta, teste um código real e gere a carga de preços da forma mais clara possível.</p>
+    </div>
+  </section>
+
+  <section class="panel balanca-showcase-panel" aria-label="Produtos preparados para a balança">
+    <div class="balanca-showcase-actions">
+      <a class="button button-secondary" href="#configuracao-balanca">⚙️ Configurações</a>
+    </div>
+
+    <section class="balanca-showcase-card balanca-showcase-product-list balanca-product-list-expanded">
+      <div class="balanca-product-panel-head">
+        <div>
+          <h2>1. Selecionar produto</h2>
+          <p>Carnes cadastradas no estoque e preparadas para uso na balança. Clique no produto para editar ou no código para gerenciar os códigos.</p>
+        </div>
+        <span class="balanca-result-count">{{ produtos_balanca|length }} resultado(s)</span>
+      </div>
+
+      <form method="get" action="{{ url_for('balanca.configuracao', empresa_id=empresa.id) }}" class="balanca-showcase-search balanca-real-search" role="search">
+        <span aria-hidden="true">⌕</span>
+        <label class="sr-only" for="balanca-q">Buscar produto</label>
+        <input id="balanca-q" name="q" type="search" value="{{ busca_produto }}" maxlength="120" placeholder="Buscar produto (nome, código, SKU ou categoria)..." autocomplete="off">
+        <button class="button button-primary" type="submit">Buscar</button>
+        {% if busca_produto %}
+          <a class="button button-secondary" href="{{ url_for('balanca.configuracao', empresa_id=empresa.id) }}">Limpar</a>
+        {% endif %}
+      </form>
+
+      <div class="balanca-showcase-products balanca-real-products">
+        {% for item in produtos_balanca %}
+          {% set produto = item.produto %}
+          {% set codigo = item.codigo %}
+          <article class="balanca-real-product-card">
+            <span class="balanca-product-emoji" aria-hidden="true">
+              {% set nome_lower = produto.nome|lower %}
+              {% if 'frango' in nome_lower or 'coxa' in nome_lower or 'sobrecoxa' in nome_lower or 'asa' in nome_lower or 'tulipa' in nome_lower or 'moela' in nome_lower or 'peito' in nome_lower %}🍗
+              {% elif 'lingui' in nome_lower or 'salsicha' in nome_lower or 'calabresa' in nome_lower %}🌭
+              {% elif 'bacon' in nome_lower or 'panceta' in nome_lower or 'pernil' in nome_lower or 'suino' in nome_lower or 'suíno' in nome_lower or 'porco' in nome_lower or 'lombo' in nome_lower or 'toucinho' in nome_lower or 'torresmo' in nome_lower %}🥓
+              {% elif 'costela' in nome_lower or 'osso' in nome_lower or 'rabada' in nome_lower or 'suan' in nome_lower or 'cordeiro' in nome_lower %}🍖
+              {% else %}🥩{% endif %}
+            </span>
+            <div class="balanca-real-product-copy">
+              <a class="balanca-product-name-link" href="{{ url_for('estoque.editar', empresa_id=empresa.id, produto_id=produto.id) }}"><strong>{{ produto.nome }}</strong></a>
+              {% if codigo %}
+                <a class="balanca-product-code-link" href="{{ url_for('codigos.lista', empresa_id=empresa.id, produto_id=produto.id) }}" title="Abrir códigos de {{ produto.nome }}">Código: {{ codigo.codigo }}</a>
+              {% else %}
+                <a class="balanca-product-code-link is-missing" href="{{ url_for('codigos.lista', empresa_id=empresa.id, produto_id=produto.id) }}">Cadastrar código</a>
+              {% endif %}
+            </div>
+            <div class="balanca-real-product-meta">
+              <strong>{{ produto.preco_venda|brl }}</strong>
+              <small>{{ produto.unidade }}</small>
+            </div>
+          </article>
+        {% else %}
+          <div class="balanca-products-empty">
+            <strong>Nenhum produto encontrado</strong>
+            <small>Revise o nome, código, SKU ou categoria pesquisada.</small>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+  </section>
+
+  <section class="inventory-overview-grid balanca-overview-grid" aria-label="Resumo da balança">
+    <article class="inventory-overview-card {% if layout_ativo %}is-success{% else %}is-danger{% endif %}">
+      <span>Leitura da etiqueta</span>
+      <strong>{{ 'Ativa' if layout_ativo else 'Desligada' }}</strong>
+      <small>{{ 'O caixa reconhece o peso da balança.' if layout_ativo else 'Etiquetas não serão interpretadas no caixa.' }}</small>
+    </article>
+    <article class="inventory-overview-card">
+      <span>Produtos com PLU</span>
+      <strong>{{ total_plu }}</strong>
+      <small>linhas disponíveis para carga</small>
+    </article>
+    <article class="inventory-overview-card {% if mgv6_ativo %}is-success{% else %}is-warning{% endif %}">
+      <span>Integração MGV6</span>
+      <strong>{{ 'Ativa' if mgv6_ativo else 'Desativada' }}</strong>
+      <small>{{ 'Conexão preparada para consulta.' if mgv6_ativo else 'Ative no ambiente para consultar e validar.' }}</small>
+    </article>
+    <article class="inventory-overview-card {% if mgv6_escrita %}is-success{% else %}is-warning{% endif %}">
+      <span>Escrita de preços</span>
+      <strong>{{ 'Ativa' if mgv6_escrita else 'Somente leitura' if mgv6_ativo else 'Desativada' }}</strong>
+      <small>{{ 'Mudanças de preço podem seguir para a balança.' if mgv6_escrita else 'Sem envio automático de preço no momento.' }}</small>
+    </article>
+  </section>
+
+  <div class="balanca-layout-grid">
+    <div class="balanca-main-stack">
+      <form method="post" class="panel balanca-form-panel" id="configuracao-balanca" novalidate>
+        {{ form.hidden_tag() }}
+
+        <section class="balanca-step-block">
+          <header class="balanca-step-head">
+            <span class="balanca-step-number">1</span>
+            <div>
+              <h2>Como a etiqueta será lida</h2>
+              <p>Defina o modelo e a estrutura do código que sai da balança.</p>
+            </div>
+          </header>
+          <div class="form-grid">
+            <div class="field">{{ form.modelo.label }} {{ form.modelo(placeholder='Prix 5 Plus') }}</div>
+            <div class="field">{{ form.prefixo.label }} {{ form.prefixo(maxlength=1) }}</div>
+            <div class="field">{{ form.tamanho_plu.label }} {{ form.tamanho_plu() }}<small>Quantidade de dígitos do PLU.</small></div>
+            <div class="field">{{ form.conteudo.label }} {{ form.conteudo() }}</div>
+            <div class="field">{{ form.casas_decimais.label }} {{ form.casas_decimais() }}<small>Use 2 para centavos e 3 para gramas.</small></div>
+          </div>
+        </section>
+
+        <section class="balanca-step-block">
+          <header class="balanca-step-head">
+            <span class="balanca-step-number">2</span>
+            <div>
+              <h2>Segurança da leitura</h2>
+              <p>Controle a tolerância de divergência e defina se a leitura ficará ativa no caixa.</p>
+            </div>
+          </header>
+          <div class="form-grid">
+            <div class="field">{{ form.tolerancia.label }} {{ form.tolerancia(placeholder='0,05') }}<small>Diferença máxima aceitável em reais.</small></div>
+          </div>
+          <div class="checkbox-group balanca-check-grid">
+            <label class="check-field">{{ form.bloquear_divergencia() }} <span>{{ form.bloquear_divergencia.label.text }}</span><small>Evita cobranças com preço desatualizado na etiqueta.</small></label>
+            <label class="check-field">{{ form.ativo() }} <span>{{ form.ativo.label.text }}</span><small>Habilita a interpretação automática da etiqueta no caixa.</small></label>
+          </div>
+        </section>
+
+        <section class="balanca-step-block">
+          <header class="balanca-step-head">
+            <span class="balanca-step-number">3</span>
+            <div>
+              <h2>Arquivo de carga de preços</h2>
+              <p>Defina como o arquivo será gerado para importação no software da balança.</p>
+            </div>
+          </header>
+          <div class="form-grid">
+            <div class="field">{{ form.separador_carga.label }} {{ form.separador_carga() }}</div>
+            <div class="field">{{ form.codificacao_carga.label }} {{ form.codificacao_carga() }}</div>
+            <div class="field">{{ form.quebra_linha_carga.label }} {{ form.quebra_linha_carga() }}</div>
+            <div class="field">{{ form.campos_carga.label }} {{ form.campos_carga() }}<small>Separe por vírgula, na ordem correta.</small></div>
+          </div>
+        </section>
+
+        <div class="form-actions balanca-form-actions">{{ form.submit(class='button button-primary') }}</div>
+      </form>
+
+      <section class="panel balanca-campos-panel">
+        <div class="section-heading balanca-panel-head">
+          <div>
+            <h2>Campos disponíveis para o arquivo</h2>
+            <p>Use somente colunas conhecidas pelo sistema para gerar a carga da balança.</p>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table class="inventory-table balanca-campos-table">
+            <thead><tr><th>Coluna</th><th>Descrição</th></tr></thead>
+            <tbody>
+              {% for chave, descricao in campos_disponiveis.items() %}
+                <tr><td><span class="code">{{ chave }}</span></td><td>{{ descricao }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel balanca-mgv6-panel">
+        <div class="section-heading balanca-panel-head">
+          <div>
+            <h2>Integração oficial Toledo MGV6</h2>
+            <p>Resumo da conexão atual do ambiente e do comportamento de escrita de preços.</p>
+          </div>
+          {% if mgv6_ativo %}
+            <form method="post" action="{{ url_for('balanca.mgv6_testar', empresa_id=empresa.id) }}">
+              {{ acao_form.csrf_token(id='csrf_mgv6_teste') }}
+              <button class="button button-secondary" type="submit">Testar conexão MGV6</button>
+            </form>
+          {% endif %}
+        </div>
+        <div class="table-scroll">
+          <table class="inventory-table balanca-status-table">
+            <tbody>
+              <tr><th>Consulta MGV6</th><td><span class="badge {{ 'badge-success' if mgv6_ativo else 'badge-muted' }}">{{ 'Ativa' if mgv6_ativo else 'Desativada' }}</span></td></tr>
+              <tr><th>Escrita de preços</th><td><span class="badge {{ 'badge-success' if mgv6_escrita else 'badge-warning' if mgv6_ativo else 'badge-muted' }}">{{ 'Ativa' if mgv6_escrita else 'Somente leitura' if mgv6_ativo else 'Desativada' }}</span></td></tr>
+              <tr><th>Endpoint</th><td><span class="code">{{ mgv6_url if mgv6_ativo else '—' }}</span></td></tr>
+              <tr><th>Loja MGV6</th><td>{{ mgv6_loja if mgv6_ativo else '—' }}</td></tr>
+              <tr><th>Balança alvo</th><td>{{ mgv6_balanca if mgv6_ativo else '—' }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="notice balanca-bottom-note">
+          {% if mgv6_escrita %}
+            Alterar preço de um produto vinculado dispara o fluxo oficial <strong>IniciaImportacao → ImportaPreco → SolicitaCargaNaBalanca → FinalizaImportacao</strong>.
+          {% elif mgv6_ativo %}
+            A integração está em <strong>somente leitura</strong>. Isso permite validar itens e testar a conexão sem iniciar importações.
+          {% else %}
+            Configure o MGV6 no ambiente para liberar consultas e sincronização de preços.
+          {% endif %}
+        </div>
+      </section>
+    </div>
+
+    <aside class="balanca-side-stack">
+      <section class="panel balanca-side-panel">
+        <header class="balanca-side-head">
+          <h2>Resumo atual</h2>
+          <span class="badge {{ 'badge-success' if layout_ativo else 'badge-warning' }}">{{ 'Ativo' if layout_ativo else 'Desligado' }}</span>
+        </header>
+        <dl class="balanca-summary-list">
+          <div><dt>Modelo</dt><dd>{{ registro.modelo if registro and registro.modelo else 'Não informado' }}</dd></div>
+          <div><dt>Prefixo</dt><dd>{{ registro.prefixo if registro else '—' }}</dd></div>
+          <div><dt>Tamanho do PLU</dt><dd>{{ registro.tamanho_plu if registro else '—' }}</dd></div>
+          <div><dt>Conteúdo</dt><dd>{{ registro.conteudo if registro else '—' }}</dd></div>
+          <div><dt>Casas decimais</dt><dd>{{ registro.casas_decimais if registro else '—' }}</dd></div>
+          <div><dt>Tolerância</dt><dd>{% if registro %}R$ {{ '%.2f'|format(registro.tolerancia)|replace('.', ',') }}{% else %}—{% endif %}</dd></div>
+          <div><dt>Versão</dt><dd>{{ registro.versao if registro else '0' }}</dd></div>
+          <div><dt>PLUs disponíveis</dt><dd>{{ total_plu }}</dd></div>
+        </dl>
+        <div class="notice balanca-side-note">
+          {% if layout_ativo %}
+            A leitura de etiqueta está pronta para o caixa identificar PLU e quantidade diretamente do código da balança.
+          {% else %}
+            Ative a leitura quando os dados forem conferidos com uma etiqueta real.
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="panel balanca-side-panel">
+        <header class="balanca-side-head">
+          <h2>Testar etiqueta</h2>
+          <span class="muted-text">13 dígitos</span>
+        </header>
+        <p class="balanca-side-copy">Digite o código impresso na etiqueta e confira se o produto e a quantidade batem com o papel.</p>
+        <form method="post" action="{{ url_for('balanca.testar', empresa_id=empresa.id) }}" class="balanca-side-form">
+          {{ teste_form.hidden_tag() }}
+          <div class="field">{{ teste_form.codigo.label }} {{ teste_form.codigo(placeholder='2002700075478', inputmode='numeric', autocomplete='off') }}</div>
+          <div class="form-actions">{{ teste_form.submit(class='button button-secondary button-full') }}</div>
+        </form>
+      </section>
+
+      <section class="panel balanca-side-panel">
+        <header class="balanca-side-head">
+          <h2>Ações rápidas</h2>
+        </header>
+        <div class="balanca-quick-actions">
+          <form method="post" action="{{ url_for('balanca.carga', empresa_id=empresa.id) }}">
+            {{ acao_form.csrf_token(id='csrf_carga') }}
+            <button class="button button-primary button-full" type="submit">Gerar arquivo de carga</button>
+          </form>
+          <a class="button button-secondary button-full" href="{{ url_for('estoque.lista', empresa_id=empresa.id) }}">Voltar ao estoque</a>
+        </div>
+      </section>
+    </aside>
+  </div>
+{% endblock %}

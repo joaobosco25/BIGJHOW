@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ produto.nome }} · Classificação fiscal{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <div>
+      <span class="eyebrow">FISCAL / PRODUTO</span>
+      <h1>{{ produto.nome }}</h1>
+      <p>{{ produto.sku_interno }} · {{ produto.unidade }} · {{ produto.categoria }}</p>
+    </div>
+    <a class="back-link" href="{{ url_for('fiscal.produtos', empresa_id=empresa.id) }}">← Voltar à lista</a>
+  </section>
+
+  <form method="post" class="form-panel" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="section-heading"><h2>Classificação da mercadoria</h2></div>
+    <div class="form-grid">
+      <div class="field">
+        {{ form.ncm.label }} {{ form.ncm(placeholder="02013000") }}
+        <small class="subline">Oito dígitos da Nomenclatura Comum do Mercosul.</small>
+      </div>
+      <div class="field">{{ form.cest.label }} {{ form.cest() }}</div>
+      <div class="field">{{ form.cfop.label }} {{ form.cfop() }}</div>
+      <div class="field">{{ form.origem.label }} {{ form.origem() }}</div>
+      <div class="field">{{ form.gtin.label }} {{ form.gtin() }}</div>
+      <div class="field">{{ form.unidade_tributavel.label }} {{ form.unidade_tributavel() }}</div>
+    </div>
+
+    <div class="section-heading">
+      <h2>ICMS</h2>
+      <p>Empresa no Simples Nacional usa CSOSN. Regime normal usa CST.</p>
+    </div>
+    <div class="form-grid">
+      <div class="field">{{ form.icms_csosn.label }} {{ form.icms_csosn() }}</div>
+      <div class="field">{{ form.icms_cst.label }} {{ form.icms_cst() }}</div>
+      <div class="field">{{ form.icms_aliquota.label }} {{ form.icms_aliquota() }}</div>
+      <div class="field">{{ form.icms_reducao_bc.label }} {{ form.icms_reducao_bc() }}</div>
+    </div>
+
+    <div class="section-heading"><h2>PIS e COFINS</h2></div>
+    <div class="form-grid">
+      <div class="field">{{ form.pis_cst.label }} {{ form.pis_cst() }}</div>
+      <div class="field">{{ form.pis_aliquota.label }} {{ form.pis_aliquota() }}</div>
+      <div class="field">{{ form.cofins_cst.label }} {{ form.cofins_cst() }}</div>
+      <div class="field">{{ form.cofins_aliquota.label }} {{ form.cofins_aliquota() }}</div>
+    </div>
+
+    <div class="field">{{ form.observacao.label }} {{ form.observacao(rows=2) }}</div>
+    <div class="form-actions">
+      {{ form.submit(class="button button-primary") }}
+      <a class="button button-secondary" href="{{ url_for('fiscal.produtos', empresa_id=empresa.id) }}">Cancelar</a>
+    </div>
+  </form>
+{% endblock %}

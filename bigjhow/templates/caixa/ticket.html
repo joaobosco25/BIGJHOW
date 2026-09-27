@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Comprovante #{{ venda.numero_formatado }} · {{ empresa.nome }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</head>
+<body class="ticket-page">
+  <main class="ticket-completion-shell">
+    {% with mensagens = get_flashed_messages(with_categories=true) %}
+      {% for categoria, mensagem in mensagens %}
+        <div class="ticket-fiscal-status is-pending no-print" role="alert">
+          <strong>{{ mensagem }}</strong>
+        </div>
+      {% endfor %}
+    {% endwith %}
+    <section class="ticket-result no-print {{ 'is-cancelled' if venda.status == 'cancelada' else '' }}" aria-labelledby="resultado-venda-titulo">
+      <span class="ticket-result-icon" aria-hidden="true">{{ '!' if venda.status == 'cancelada' else '✓' }}</span>
+      <span class="eyebrow">COMPROVANTE DO CLIENTE</span>
+      <h1 id="resultado-venda-titulo">{{ 'Venda cancelada' if venda.status == 'cancelada' else 'Venda finalizada' }}</h1>
+      <p>{{ 'O registro foi preservado e o estoque foi restaurado.' if venda.status == 'cancelada' else 'Pagamento registrado e estoque atualizado com sucesso.' }}</p>
+      <div class="ticket-result-total"><span>Total</span><strong>{{ venda.total|brl }}</strong><small>Venda #{{ venda.numero_formatado }}</small></div>
+      <div class="ticket-result-payments" aria-label="Formas de pagamento">
+        {% for pagamento in venda.pagamentos %}<span>{{ pagamento.metodo_rotulo }} · {{ pagamento.valor|brl }}</span>{% endfor %}
+        {% if venda.troco > 0 %}<span>Troco · {{ venda.troco|brl }}</span>{% endif %}
+      </div>
+      <div class="ticket-result-actions">
+        <button class="button button-primary button-large" type="button" data-print-ticket>Imprimir via do cliente</button>
+        {% if venda.status == 'finalizada' %}
+          <form method="post" action="{{ url_for('caixa.iniciar', empresa_id=empresa.id) }}">
+            {{ iniciar_form.hidden_tag() }}
+            <button class="button button-secondary button-large" type="submit">Nova venda</button>
+          </form>
+        {% else %}
+          <a class="button button-secondary button-large" href="{{ url_for('operacao.painel', empresa_id=empresa.id) }}">Voltar ao caixa</a>
+        {% endif %}
+      </div>
+      {% if documento %}
+        <div class="ticket-fiscal-status {{ 'is-ok' if documento.status == 'autorizado' else 'is-pending' }}">
+          {% if documento.status == 'autorizado' %}
+            <strong>{{ 'Documento de ensaio gerado' if documento.sem_valor_fiscal else 'Documento fiscal emitido' }}</strong>
+            <small>NFC-e {{ documento.numero_formatado }} · série {{ documento.serie }}</small>
+          {% else %}
+            <strong>Documento fiscal: {{ documento.status_rotulo|lower }}</strong>
+            <small>{{ documento.mensagem_status or 'sem detalhe da SEFAZ' }}</small>
+          {% endif %}
+          <a href="{{ url_for('fiscal.danfe', empresa_id=empresa.id, documento_id=documento.id) }}">Ver o DANFE</a>
+        </div>
+      {% elif emissao_ativa %}
+        <div class="ticket-fiscal-status is-pending">
+          <strong>Esta venda não gerou documento fiscal</strong>
+          <small>A venda está registrada e o estoque baixou. Confira o aviso desta finalização. Se ele não estiver mais disponível, solicite a verificação do cadastro fiscal; não refaça a venda.</small>
+          {% if current_user.papel in ['proprietario', 'administrador'] %}
+            <a href="{{ url_for('fiscal.painel', empresa_id=empresa.id) }}">Abrir o painel fiscal</a>
+          {% endif %}
+        </div>
+      {% endif %}
+      <a class="ticket-detail-link" href="{{ url_for('caixa.detalhe', empresa_id=empresa.id, venda_id=venda.id) }}">Ver registro completo da venda</a>
+    </section>
+
+    <section class="ticket-preview-section">
+      <div class="ticket-preview-heading no-print">
+        <span>Prévia da via do cliente</span>
+        <small>Documento não fiscal · impressão em 80 mm</small>
+      </div>
+      <article class="ticket-paper">
+        <header class="ticket-heading">
+          <strong>{{ empresa.nome }}</strong>
+          <span>DOCUMENTO NÃO FISCAL</span>
+          <small>Venda #{{ venda.numero_formatado }}</small>
+        </header>
+        {% if venda.status == 'cancelada' %}<div class="ticket-cancelled">VENDA CANCELADA</div>{% endif %}
+        <dl class="ticket-meta">
+          <div><dt>Data</dt><dd>{{ venda.finalizado_em|data_hora }}</dd></div>
+          <div><dt>Operador</dt><dd>{{ venda.operador.nome if venda.operador else 'Usuário removido' }}</dd></div>
+        </dl>
+        <table class="ticket-items">
+          <thead><tr><th>Item</th><th class="number">Valor</th></tr></thead>
+          <tbody>
+            {% for item in venda.itens %}
+              <tr><td><strong>{{ item.produto_nome }}</strong><small>{{ item.quantidade|quantidade }} {{ item.unidade }} × {{ item.preco_unitario|brl }}</small></td><td class="number">{{ item.subtotal|brl }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="ticket-total"><span>TOTAL</span><strong>{{ venda.total|brl }}</strong></div>
+        <section class="ticket-payments">
+          {% for pagamento in venda.pagamentos %}<div><span>{{ pagamento.metodo_rotulo }}</span><strong>{{ pagamento.valor|brl }}</strong></div>{% endfor %}
+          {% if venda.troco > 0 %}<div><span>Troco</span><strong>{{ venda.troco|brl }}</strong></div>{% endif %}
+        </section>
+        {% if venda.status == 'cancelada' %}<p class="ticket-cancel-reason">Cancelada em {{ venda.cancelado_em|data_hora }}<br>{{ venda.motivo_cancelamento }}</p>{% endif %}
+        <footer class="ticket-footer">
+          <span>Obrigado pela preferência.</span>
+          <small>Este comprovante não possui valor fiscal.</small>
+        </footer>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

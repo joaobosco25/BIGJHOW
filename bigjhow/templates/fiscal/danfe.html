@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>{{ dados.documento }} {{ dados.numero }} · {{ empresa.nome }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</head>
+<body class="ticket-page">
+  <main class="ticket-completion-shell">
+    <section class="ticket-result no-print">
+      <span class="eyebrow">{{ dados.documento }}</span>
+      <h1>{% if dados.tem_valor_fiscal %}Documento fiscal autorizado{% else %}Documento sem valor fiscal{% endif %}</h1>
+      {% if dados.aviso %}<p><strong>{{ dados.aviso }}</strong></p>{% endif %}
+      <div class="ticket-result-total"><span>Total</span><strong>R$ {{ dados.total }}</strong><small>nº {{ dados.numero }} · série {{ dados.serie }}</small></div>
+      <div class="ticket-result-actions">
+        <button class="button button-primary button-large" type="button" data-print-ticket>Imprimir cupom</button>
+        <a class="button button-secondary button-large" href="{{ url_for('operacao.painel', empresa_id=empresa.id) }}">Voltar ao caixa</a>
+      </div>
+    </section>
+
+    <section class="ticket-preview-section">
+      <div class="ticket-preview-heading no-print">
+        <span>Prévia da via do cliente</span>
+        <small>Impressão em 80 mm</small>
+      </div>
+      <article class="ticket-paper danfe-paper">
+        <header class="ticket-heading">
+          <strong>{{ dados.emitente.razao_social }}</strong>
+          {% if dados.emitente.nome_fantasia %}<span>{{ dados.emitente.nome_fantasia }}</span>{% endif %}
+          <small>CNPJ {{ dados.emitente.cnpj }} · IE {{ dados.emitente.inscricao_estadual }}</small>
+          <small>{{ dados.emitente.endereco }}</small>
+        </header>
+
+        {% if dados.aviso %}<div class="ticket-cancelled">{{ dados.aviso }}</div>{% endif %}
+
+        <div class="danfe-titulo">
+          <strong>{{ dados.documento }}</strong>
+          <small>Documento auxiliar da Nota Fiscal de Consumidor Eletrônica</small>
+        </div>
+
+        <table class="ticket-items">
+          <thead><tr><th>Item</th><th class="number">Valor</th></tr></thead>
+          <tbody>
+            {% for item in dados.itens %}
+              <tr>
+                <td>
+                  <strong>{{ item.numero }} · {{ item.descricao }}</strong>
+                  <small>{{ item.codigo }} — {{ item.quantidade }} {{ item.unidade }} × R$ {{ item.valor_unitario }}</small>
+                </td>
+                <td class="number">R$ {{ item.valor_total }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <div class="ticket-total"><span>QTDE. TOTAL DE ITENS</span><strong>{{ dados.quantidade_itens }}</strong></div>
+        <div class="ticket-total"><span>VALOR TOTAL R$</span><strong>{{ dados.total_produtos }}</strong></div>
+        <div class="ticket-total"><span>DESCONTOS</span><strong>{{ dados.total_desconto }}</strong></div>
+        <div class="ticket-total"><span>TOTAL R$</span><strong>{{ dados.total }}</strong></div>
+
+        <section class="ticket-payments">
+          <div class="danfe-cabecalho-pagamento"><span>FORMA DE PAGAMENTO</span><span>VALOR PAGO</span></div>
+          {% for pagamento in dados.pagamentos %}
+            <div><span>{{ pagamento.forma }}</span><strong>R$ {{ pagamento.valor }}</strong></div>
+          {% endfor %}
+          {% if dados.troco != '0.00' %}<div><span>Troco</span><strong>R$ {{ dados.troco }}</strong></div>{% endif %}
+        </section>
+
+        <section class="danfe-chave">
+          <small>Consulte pela Chave de Acesso em:</small>
+          {% if dados.url_consulta %}<small class="code">{{ dados.url_consulta }}</small>{% endif %}
+          <span class="code">{{ dados.chave_formatada }}</span>
+        </section>
+
+        <div class="danfe-consumidor">{{ dados.consumidor }}</div>
+
+        {% if qrcode %}
+          <div class="danfe-qrcode" role="img" aria-label="QR Code de consulta do documento fiscal">
+            {{ qrcode|safe }}
+          </div>
+        {% else %}
+          <div class="notice">
+            QR Code indisponível: o CSC e a URL de consulta da UF ainda não estão
+            configurados. Sem eles o cupom não cumpre o leiaute da NFC-e.
+          </div>
+        {% endif %}
+
+        <footer class="ticket-footer">
+          <small>NFC-e {{ dados.numero }} · Série {{ dados.serie }} · {{ dados.emissao }}</small>
+          {% if dados.protocolo %}<small>Protocolo de Autorização: {{ dados.protocolo }}</small>{% endif %}
+          {% if dados.autorizacao %}<small>Data de autorização {{ dados.autorizacao }}</small>{% endif %}
+          {% if dados.operador %}
+            <small>Caixa{% if dados.terminal %} {{ dados.terminal }}{% endif %} · Op.: {{ dados.operador }}</small>
+          {% endif %}
+          <span>Obrigado pela preferência.</span>
+        </footer>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}{{ inventario.descricao }} · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <div>
+      <a class="back-link" href="{{ url_for('inventario.lista', empresa_id=empresa.id) }}">← Inventários em lote</a>
+      <span class="eyebrow">{{ empresa.nome|upper }} / CONTAGEM CONTROLADA</span>
+      <h1>{{ inventario.descricao }}</h1>
+      <p>Vazio significa não contado. O valor zero confirma que o saldo físico foi contado e é zero.</p>
+    </div>
+    <span class="badge status-lote {% if inventario.status == 'finalizado' %}badge-success{% elif inventario.status == 'cancelado' %}badge-muted{% else %}badge-warning{% endif %}">{{ inventario.status_rotulo }}</span>
+  </section>
+
+  <section class="metric-grid inventario-metricas" aria-label="Andamento da contagem">
+    <article class="metric-card"><span>Produtos no lote</span><strong>{{ resumo.total }}</strong><small>fotografia do início da contagem</small></article>
+    <article class="metric-card success"><span>Contados</span><strong>{{ resumo.contados }}</strong><small>inclui quantidades iguais a zero</small></article>
+    <article class="metric-card warning"><span>Pendentes</span><strong>{{ resumo.pendentes }}</strong><small>campos que continuam vazios</small></article>
+    <article class="metric-card muted"><span>Versão do rascunho</span><strong>{{ inventario.versao }}</strong><small>proteção contra sobrescrita</small></article>
+  </section>
+
+  {% if inventario.status == 'rascunho' %}
+    <section class="panel planilha-panel">
+      <div>
+        <span class="eyebrow">PLANILHA CONTROLADA</span>
+        <h2>Contar fora da tela</h2>
+        <p>Baixe a versão atual, preencha somente a coluna de quantidade e importe o mesmo arquivo. Uma planilha antiga ou alterada será recusada.</p>
+      </div>
+      <div class="planilha-acoes">
+        <a class="button button-secondary" href="{{ url_for('inventario.baixar_planilha', empresa_id=empresa.id, inventario_id=inventario.id) }}">Baixar XLSX atual</a>
+        <form method="post" enctype="multipart/form-data" action="{{ url_for('inventario.importar_planilha', empresa_id=empresa.id, inventario_id=inventario.id) }}" class="upload-form">
+          {{ importar_form.hidden_tag() }}
+          <input type="hidden" name="page" value="{{ itens.page }}">
+          <input type="hidden" name="q" value="{{ busca }}">
+          <input type="hidden" name="situacao" value="{{ situacao }}">
+          {{ importar_form.arquivo(accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") }}
+          {{ importar_form.submit(class="button button-primary") }}
+        </form>
+      </div>
+    </section>
+  {% endif %}
+
+  <section class="panel">
+    <div class="toolbar">
+      <form method="get" class="search-form">
+        <label class="sr-only" for="q-inventario">Buscar produto no inventário</label>
+        <input id="q-inventario" name="q" value="{{ busca }}" maxlength="120" placeholder="Buscar por produto, código, SKU ou categoria">
+        <input type="hidden" name="situacao" value="{{ situacao }}">
+        <button class="button button-secondary" type="submit">Buscar</button>
+      </form>
+      <nav class="filter-tabs" aria-label="Filtrar contagem">
+        <a class="{% if situacao == 'todos' %}selected{% endif %}" href="{{ url_for('inventario.detalhe', empresa_id=empresa.id, inventario_id=inventario.id, q=busca, situacao='todos') }}">Todos</a>
+        <a class="{% if situacao == 'pendentes' %}selected{% endif %}" href="{{ url_for('inventario.detalhe', empresa_id=empresa.id, inventario_id=inventario.id, q=busca, situacao='pendentes') }}">Pendentes</a>
+        <a class="{% if situacao == 'contados' %}selected{% endif %}" href="{{ url_for('inventario.detalhe', empresa_id=empresa.id, inventario_id=inventario.id, q=busca, situacao='contados') }}">Contados</a>
+      </nav>
+    </div>
+
+    <form method="post" action="{{ url_for('inventario.salvar', empresa_id=empresa.id, inventario_id=inventario.id) }}">
+      {% if inventario.status == 'rascunho' %}
+        {{ salvar_form.hidden_tag() }}
+        <input type="hidden" name="page" value="{{ itens.page }}">
+        <input type="hidden" name="q" value="{{ busca }}">
+        <input type="hidden" name="situacao" value="{{ situacao }}">
+      {% endif %}
+      <div class="table-scroll">
+        <table class="inventory-count-table">
+          <thead>
+            <tr><th>Código</th><th>Produto</th><th>Categoria</th><th>Unidade</th><th class="number">Referência</th><th class="count-column">Quantidade contada</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for item in itens.items %}
+              <tr>
+                <td><span class="code">{{ item.produto.codigo_externo or item.produto.sku_interno }}</span></td>
+                <td><strong>{{ item.produto.nome }}</strong><small class="subline">{{ item.produto.sku_interno }}</small></td>
+                <td>{{ item.produto.categoria }}</td>
+                <td>{{ item.unidade_referencia }}</td>
+                <td class="number">{{ item.quantidade_referencia|quantidade }}</td>
+                <td class="count-column">
+                  {% if inventario.status == 'rascunho' %}
+                    <label class="sr-only" for="quantidade-{{ item.id }}">Quantidade de {{ item.produto.nome }}</label>
+                    <input id="quantidade-{{ item.id }}" class="quantity-input" name="quantidade_{{ item.id }}" value="{% if item.quantidade_contada is not none %}{{ item.quantidade_contada }}{% endif %}" inputmode="decimal" maxlength="16" autocomplete="off" placeholder="Vazio">
+                  {% else %}
+                    <strong>{% if item.quantidade_contada is not none %}{{ item.quantidade_contada|quantidade }}{% else %}—{% endif %}</strong>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if item.quantidade_contada is not none %}<span class="badge badge-success">Contado</span>{% else %}<span class="badge badge-warning">Pendente</span>{% endif %}
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="7" class="empty-state">Nenhum item encontrado com esses filtros.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if inventario.status == 'rascunho' and itens.items %}
+        <div class="table-save-bar">
+          <p>Salve esta página antes de trocar de página ou aplicar outro filtro.</p>
+          <button class="button button-primary" type="submit">Salvar quantidades desta página</button>
+        </div>
+      {% endif %}
+    </form>
+
+    {% if itens.pages > 1 %}
+      <nav class="pagination" aria-label="Paginação do inventário">
+        {% if itens.has_prev %}<a href="{{ url_for('inventario.detalhe', empresa_id=empresa.id, inventario_id=inventario.id, q=busca, situacao=situacao, page=itens.prev_num) }}">← Anterior</a>{% endif %}
+        <span>Página {{ itens.page }} de {{ itens.pages }} · {{ itens.total }} resultado(s)</span>
+        {% if itens.has_next %}<a href="{{ url_for('inventario.detalhe', empresa_id=empresa.id, inventario_id=inventario.id, q=busca, situacao=situacao, page=itens.next_num) }}">Próxima →</a>{% endif %}
+      </nav>
+    {% endif %}
+  </section>
+
+  {% if inventario.status == 'rascunho' %}
+    <section class="inventory-finalize-grid">
+      <article class="panel finalize-panel">
+        <span class="eyebrow">CONFIRMAÇÃO FINAL</span>
+        <h2>Aplicar somente os itens contados</h2>
+        <p>{{ resumo.contados }} produto(s) terão o saldo confirmado. Os {{ resumo.pendentes }} campos vazios continuarão marcados como “aguardando inventário”.</p>
+        <form method="post" action="{{ url_for('inventario.finalizar', empresa_id=empresa.id, inventario_id=inventario.id) }}" data-confirm="Finalizar os itens preenchidos? Esta confirmação gera movimentações de estoque e não poderá ser editada.">
+          {{ finalizar_form.hidden_tag() }}
+          <input type="hidden" name="page" value="{{ itens.page }}">
+          <input type="hidden" name="q" value="{{ busca }}">
+          <input type="hidden" name="situacao" value="{{ situacao }}">
+          <label class="check-field" for="{{ finalizar_form.confirmacao.id }}">
+            {{ finalizar_form.confirmacao() }}
+            <span>Revisei as quantidades<small>Zero é saldo confirmado; vazio não será aplicado.</small></span>
+          </label>
+          {{ finalizar_form.submit(class="button button-primary", disabled=(resumo.contados == 0)) }}
+        </form>
+      </article>
+      <article class="panel cancel-panel">
+        <span class="eyebrow">DESCARTAR RASCUNHO</span>
+        <h2>Cancelar sem movimentar estoque</h2>
+        <p>O histórico do cancelamento será preservado e nenhuma quantidade será aplicada.</p>
+        <form method="post" action="{{ url_for('inventario.cancelar', empresa_id=empresa.id, inventario_id=inventario.id) }}" data-confirm="Cancelar este rascunho? Nenhum saldo será alterado.">
+          {{ cancelar_form.hidden_tag() }}
+          <input type="hidden" name="page" value="{{ itens.page }}">
+          <input type="hidden" name="q" value="{{ busca }}">
+          <input type="hidden" name="situacao" value="{{ situacao }}">
+          <button class="button button-danger" type="submit">Cancelar rascunho</button>
+        </form>
+      </article>
+    </section>
+  {% else %}
+    <section class="panel inventory-closed-note">
+      <span class="eyebrow">REGISTRO SOMENTE PARA CONSULTA</span>
+      <h2>Inventário {{ inventario.status_rotulo|lower }}</h2>
+      <p>Este registro não pode mais ser alterado. {% if inventario.status == 'finalizado' %}As movimentações correspondentes estão preservadas no histórico do estoque.{% else %}Nenhum saldo foi alterado por este lote.{% endif %}</p>
+      <a class="button button-secondary" href="{{ url_for('inventario.baixar_planilha', empresa_id=empresa.id, inventario_id=inventario.id) }}">Baixar registro XLSX</a>
+    </section>
+  {% endif %}
+{% endblock %}

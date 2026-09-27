@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Movimentar estoque · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="page-header compact">
+    <div><a class="back-link" href="{{ url_for('estoque.lista', empresa_id=empresa.id) }}">← Voltar ao estoque</a><h1>Movimentar estoque</h1><p>O saldo é atualizado em transação e a operação fica registrada.</p></div>
+  </section>
+  <div class="split-layout">
+    <section class="product-summary">
+      <span class="eyebrow">PRODUTO</span><h2>{{ produto.nome }}</h2>
+      <dl><div><dt>Código</dt><dd>{{ produto.codigo_externo or produto.sku_interno }}</dd></div><div><dt>Unidade</dt><dd>{{ produto.unidade }}</dd></div><div><dt>Saldo atual</dt><dd class="gold-value">{{ produto.saldo.quantidade|quantidade }}</dd></div></dl>
+      {% if produto.saldo.aguardando_inventario %}<div class="notice">Este item ainda aguarda o primeiro inventário.</div>{% endif %}
+    </section>
+    <section class="form-panel">
+      <form method="post" class="form-stack" novalidate>
+        {{ form.hidden_tag() }}
+        <div class="field">{{ form.operacao.label }}{{ form.operacao() }}{% for error in form.operacao.errors %}<small class="field-error">{{ error }}</small>{% endfor %}</div>
+        <div class="field">
+          {{ form.quantidade.label }}{{ form.quantidade(inputmode='decimal', autocomplete='off', placeholder='0,000') }}
+          <small>Use vírgula ou ponto apenas para os decimais. Ex.: 2,500 significa dois quilos e meio. Não use separador de milhar.</small>
+          {% for error in form.quantidade.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+        </div>
+        <div class="field">{{ form.motivo.label }}{{ form.motivo(rows='4', placeholder='Descreva a origem desta movimentação') }}{% for error in form.motivo.errors %}<small class="field-error">{{ error }}</small>{% endfor %}</div>
+        <div class="form-actions"><a class="button button-secondary" href="{{ url_for('estoque.lista', empresa_id=empresa.id) }}">Cancelar</a>{{ form.submit(class='button button-primary') }}</div>
+      </form>
+    </section>
+  </div>
+{% endblock %}

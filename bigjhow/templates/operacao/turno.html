@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Turno · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <div>
+      {% if current_user.papel == 'operador' %}
+        <a class="back-link" href="{{ url_for('operacao.painel', empresa_id=empresa.id) }}">← Voltar ao caixa</a>
+      {% else %}
+        <a class="back-link" href="{{ url_for('operacao.historico', empresa_id=empresa.id) }}">← Voltar ao histórico</a>
+      {% endif %}
+      <span class="eyebrow">{{ empresa.nome|upper }} / {{ turno.terminal.codigo }}</span>
+      <h1>Turno de {{ turno.operador.nome if turno.operador else 'usuário removido' }}</h1>
+      <p>Aberto em {{ turno.aberto_em|data_hora }}{% if turno.fechado_em %} · fechado em {{ turno.fechado_em|data_hora }}{% endif %}</p>
+    </div>
+    <span class="badge {{ 'badge-success' if turno.status == 'aberto' else '' }}">{{ turno.status_rotulo }}</span>
+  </section>
+
+  {% if turno.status == 'fechado' %}
+    <section class="metric-grid operation-metrics">
+      <article class="metric-card"><span>Total vendido</span><strong>{{ resumo.total_vendas|brl }}</strong><small>{{ resumo.vendas_finalizadas }} venda(s)</small></article>
+      <article class="metric-card"><span>Dinheiro recebido</span><strong>{{ resumo.dinheiro_recebido|brl }}</strong><small>bruto entregue pelos clientes</small></article>
+      <article class="metric-card"><span>Troco entregue</span><strong>{{ resumo.troco|brl }}</strong><small>saída para clientes</small></article>
+      <article class="metric-card"><span>Esperado na gaveta</span><strong>{{ resumo.dinheiro|brl }}</strong><small>após sangrias e suprimentos</small></article>
+    </section>
+
+    <section class="panel shift-detail-section">
+      <div class="section-heading"><div><span class="eyebrow">FORMAS DE PAGAMENTO</span><h2>Recebimentos do turno</h2></div></div>
+      <div class="shift-payment-grid">
+        <div><span>Dinheiro líquido</span><strong>{{ resumo.dinheiro_vendas|brl }}</strong></div>
+        <div><span>PIX</span><strong>{{ resumo.pix|brl }}</strong></div>
+        <div><span>Débito</span><strong>{{ resumo.debito|brl }}</strong></div>
+        <div><span>Crédito</span><strong>{{ resumo.credito|brl }}</strong></div>
+      </div>
+    </section>
+
+    <section class="panel shift-detail-section">
+      <div class="section-heading"><div><span class="eyebrow">CONFERÊNCIA FINAL</span><h2>Contado e esperado</h2></div></div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Meio</th><th class="number">Esperado</th><th class="number">Informado</th><th class="number">Diferença</th></tr></thead>
+          <tbody>
+            <tr><td>Dinheiro</td><td class="number">{{ turno.dinheiro_esperado|brl }}</td><td class="number">{{ turno.dinheiro_informado|brl }}</td><td class="number">{{ turno.dinheiro_diferenca|brl }}</td></tr>
+            <tr><td>PIX</td><td class="number">{{ turno.pix_esperado|brl }}</td><td class="number">{{ turno.pix_informado|brl }}</td><td class="number">{{ turno.pix_diferenca|brl }}</td></tr>
+            <tr><td>Débito</td><td class="number">{{ turno.debito_esperado|brl }}</td><td class="number">{{ turno.debito_informado|brl }}</td><td class="number">{{ turno.debito_diferenca|brl }}</td></tr>
+            <tr><td>Crédito</td><td class="number">{{ turno.credito_esperado|brl }}</td><td class="number">{{ turno.credito_informado|brl }}</td><td class="number">{{ turno.credito_diferenca|brl }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      {% if turno.justificativa_fechamento %}<p class="shift-justification"><strong>Justificativa:</strong> {{ turno.justificativa_fechamento }}</p>{% endif %}
+    </section>
+  {% else %}
+    <div class="shift-live-actions">
+      <details class="panel operation-action-card" id="movimentacao-caixa">
+        <summary><span class="operation-action-icon" aria-hidden="true">↕</span><span><strong>Sangria ou suprimento</strong><small>Retirar ou acrescentar dinheiro</small></span><span class="operation-action-arrow" aria-hidden="true">⌄</span></summary>
+        <div class="operation-action-body">
+          <p>Operadores enviam uma solicitação. Proprietário e administrador registram com autorização imediata.</p>
+          <form method="post" action="{{ url_for('operacao.movimentar', empresa_id=empresa.id, turno_id=turno.id) }}" class="stacked-form" novalidate>
+            {{ movimento_form.hidden_tag() }}
+            <div class="field">{{ movimento_form.tipo.label }}{{ movimento_form.tipo() }}</div>
+            <div class="field">{{ movimento_form.valor.label }}{{ movimento_form.valor(inputmode='decimal', autocomplete='off', placeholder='0,00') }}</div>
+            <div class="field">{{ movimento_form.motivo.label }}{{ movimento_form.motivo(rows='3') }}</div>
+            {{ movimento_form.submit(class='button button-primary') }}
+          </form>
+        </div>
+      </details>
+
+      <section class="panel blind-close-panel" id="fechamento-caixa">
+        <span class="eyebrow">FECHAMENTO CEGO</span>
+        <h2>Contar e fechar o caixa</h2>
+        <p>Os valores esperados permanecem ocultos até a confirmação. O servidor calcula as diferenças sem permitir que a tela influencie a contagem.</p>
+        <form method="post" action="{{ url_for('operacao.fechar', empresa_id=empresa.id, turno_id=turno.id) }}" class="stacked-form" novalidate data-confirm="Fechar este turno? Novas vendas exigirão outra abertura.">
+          {{ fechar_form.hidden_tag() }}
+          <div class="form-grid compact">
+            <div class="field">{{ fechar_form.dinheiro.label }}{{ fechar_form.dinheiro(inputmode='decimal', autocomplete='off', placeholder='0,00') }}</div>
+            <div class="field">{{ fechar_form.pix.label }}{{ fechar_form.pix(inputmode='decimal', autocomplete='off', placeholder='0,00') }}</div>
+            <div class="field">{{ fechar_form.debito.label }}{{ fechar_form.debito(inputmode='decimal', autocomplete='off', placeholder='0,00') }}</div>
+            <div class="field">{{ fechar_form.credito.label }}{{ fechar_form.credito(inputmode='decimal', autocomplete='off', placeholder='0,00') }}</div>
+          </div>
+          <div class="field">{{ fechar_form.justificativa.label }}{{ fechar_form.justificativa(rows='3', placeholder='Obrigatória se houver diferença') }}</div>
+          {{ fechar_form.submit(class='button button-danger', value='Fechar caixa') }}
+        </form>
+      </section>
+    </div>
+  {% endif %}
+
+  <section class="panel shift-detail-section">
+    <div class="section-heading"><div><span class="eyebrow">MOVIMENTOS</span><h2>Sangrias e suprimentos</h2></div></div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Data</th><th>Tipo</th><th>Status</th><th>Motivo</th><th class="number">Valor</th></tr></thead>
+        <tbody>
+          {% for movimento in turno.movimentos %}
+            <tr><td>{{ movimento.criado_em|data_hora }}</td><td>{{ movimento.tipo_rotulo }}</td><td>{{ movimento.status_rotulo }}</td><td>{{ movimento.motivo }}</td><td class="number">{{ movimento.valor|brl }}</td></tr>
+          {% else %}<tr><td colspan="5" class="empty-state">Nenhum movimento neste turno.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {% if turno.status == 'fechado' %}
+    <section class="panel shift-detail-section">
+      <div class="section-heading"><div><span class="eyebrow">VENDAS</span><h2>Operações do turno</h2></div></div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Venda</th><th>Finalização</th><th>Status</th><th>Pagamento</th><th class="number">Total</th><th>Ação</th></tr></thead>
+          <tbody>
+            {% for venda in turno.vendas if venda.status in ['finalizada', 'cancelada'] %}
+              <tr><td>#{{ venda.numero_formatado }}</td><td>{{ venda.finalizado_em|data_hora }}</td><td>{{ venda.status_rotulo }}</td><td>{% for pagamento in venda.pagamentos %}{{ pagamento.metodo_rotulo }}{% if not loop.last %}, {% endif %}{% endfor %}</td><td class="number">{{ venda.total|brl }}</td><td><a href="{{ url_for('caixa.detalhe', empresa_id=empresa.id, venda_id=venda.id) }}">Detalhes</a></td></tr>
+            {% else %}<tr><td colspan="6" class="empty-state">Nenhuma venda finalizada neste turno.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}

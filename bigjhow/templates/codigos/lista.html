@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Códigos de {{ produto.nome }}{% endblock %}
+{% block content %}
+  <section class="page-header compact">
+    <div>
+      <a class="back-link" href="{{ url_for('estoque.lista', empresa_id=empresa.id, q=produto.sku_interno) }}">← Voltar ao estoque</a>
+      <span class="eyebrow">{{ empresa.nome|upper }} / IDENTIFICAÇÃO SEGURA</span>
+      <h1>Códigos do produto</h1>
+      <p>O caixa só reconhece códigos ativos e únicos dentro desta empresa.</p>
+    </div>
+  </section>
+
+  <section class="split-layout code-layout">
+    <article class="product-summary">
+      <span class="eyebrow">PRODUTO VINCULADO</span>
+      <h2>{{ produto.nome }}</h2>
+      <dl>
+        <div><dt>SKU interno</dt><dd class="code">{{ produto.sku_interno }}</dd></div>
+        <div><dt>Código externo original</dt><dd>{{ produto.codigo_externo or '—' }}</dd></div>
+        <div><dt>Unidade</dt><dd>{{ produto.unidade }}</dd></div>
+        <div><dt>Preço atual</dt><dd class="gold-value">{{ produto.preco_venda|brl }}</dd></div>
+        <div><dt>Situação</dt><dd>{{ 'Ativo' if produto.ativo else 'Arquivado' }}</dd></div>
+      </dl>
+      <p class="notice">Separadores como hífen e ponto são ignorados na leitura. Por exemplo, <strong>789-123</strong> e <strong>789123</strong> representam a mesma chave e não podem ser cadastrados em produtos diferentes.</p>
+    </article>
+
+    <section class="form-panel">
+      <span class="eyebrow">NOVO IDENTIFICADOR</span>
+      <h2>Cadastrar código de leitura</h2>
+      {% if produto.ativo %}
+        <form method="post" class="form-stack" novalidate>
+          {{ form.hidden_tag() }}
+          <div class="field">
+            {{ form.codigo.label }}
+            {{ form.codigo(autocomplete='off', inputmode='text', placeholder='Leia ou digite o código') }}
+            <small>Não use nome, preço ou quantidade neste campo.</small>
+            {% for error in form.codigo.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+          </div>
+          <div class="field">
+            {{ form.tipo.label }}{{ form.tipo() }}
+            {% for error in form.tipo.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+          </div>
+          <label class="check-field">{{ form.principal() }}<span>{{ form.principal.label.text }}<small>O código principal será destacado no cadastro.</small></span></label>
+          <div class="form-actions">{{ form.submit(class='button button-primary') }}</div>
+        </form>
+      {% else %}
+        <div class="flash flash-aviso">Restaure o produto antes de cadastrar um novo código.</div>
+      {% endif %}
+    </section>
+  </section>
+
+  <section class="panel code-history-panel">
+    <div class="section-heading">
+      <div><span class="eyebrow">HISTÓRICO PRESERVADO</span><h2>Códigos cadastrados</h2></div>
+    </div>
+    <div class="table-scroll">
+      <table class="code-table">
+        <thead><tr><th>Código</th><th>Chave reconhecida</th><th>Tipo</th><th>Situação</th><th>Criado em</th><th class="actions">Ação</th></tr></thead>
+        <tbody>
+          {% for codigo in codigos %}
+            <tr>
+              <td><strong class="code">{{ codigo.codigo }}</strong>{% if codigo.principal and codigo.ativo %}<span class="badge badge-success code-primary">Principal</span>{% endif %}</td>
+              <td><span class="code">{{ codigo.chave_busca }}</span></td>
+              <td>{{ codigo.tipo_rotulo }}</td>
+              <td><span class="badge {{ 'badge-success' if codigo.ativo else 'badge-muted' }}">{{ 'Ativo' if codigo.ativo else 'Desativado' }}</span></td>
+              <td class="nowrap">{{ codigo.criado_em|data_hora }}</td>
+              <td class="actions">
+                {% set status_form = formularios_status[codigo.id] %}
+                <form method="post" action="{{ url_for('codigos.alterar_status', empresa_id=empresa.id, produto_id=produto.id, codigo_id=codigo.id) }}" data-confirm="{{ 'Desativar este código? Ele deixará de ser reconhecido pelo caixa.' if codigo.ativo else 'Reativar este código para uso no caixa?' }}">
+                  {{ status_form.hidden_tag() }}
+                  <button type="submit" class="{{ 'link-danger' if codigo.ativo else '' }}">{{ 'Desativar' if codigo.ativo else 'Reativar' }}</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="empty-state">Nenhum código de caixa cadastrado. O código externo do produto não é usado automaticamente quando é ambíguo.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

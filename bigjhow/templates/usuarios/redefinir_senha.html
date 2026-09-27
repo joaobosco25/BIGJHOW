@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Redefinir senha{% endblock %}
+{% block content %}
+  <section class="page-header compact">
+    <div>
+      <a class="back-link" href="{{ url_for('usuarios.lista') }}">← Voltar aos usuários</a>
+      <span class="eyebrow">SEGURANÇA DA CONTA</span>
+      <h1>Redefinir senha</h1>
+      <p>{{ alvo.nome }} · @{{ alvo.usuario }}</p>
+    </div>
+  </section>
+
+  <section class="form-panel form-panel-narrow">
+    <div class="notice notice-before-form">Todas as sessões atuais serão encerradas. A nova senha será temporária e deverá ser alterada no próximo acesso.</div>
+    <form method="post" class="form-stack" novalidate>
+      {{ form.hidden_tag() }}
+      <div class="field">
+        {{ form.senha_temporaria.label }}
+        {{ form.senha_temporaria(autocomplete='new-password', autofocus=true, aria_describedby='regras-senha') }}
+        <small id="regras-senha">Mínimo de 12 caracteres, com maiúscula, minúscula, número e símbolo. Não use o nome ou usuário.</small>
+        {% for error in form.senha_temporaria.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </div>
+      <div class="field">
+        {{ form.confirmar_senha.label }}
+        {{ form.confirmar_senha(autocomplete='new-password') }}
+        {% for error in form.confirmar_senha.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </div>
+      <div class="form-actions">
+        <a class="button button-secondary" href="{{ url_for('usuarios.lista') }}">Cancelar</a>
+        {{ form.submit(class='button button-primary') }}
+      </div>
+    </form>
+  </section>
+{% endblock %}

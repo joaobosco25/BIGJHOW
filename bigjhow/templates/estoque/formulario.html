@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{% if produto %}Editar{% else %}Novo produto{% endif %} · {{ empresa.nome }}{% endblock %}
+{% block content %}
+  <section class="page-header compact">
+    <div>
+      <a class="back-link" href="{{ url_for('estoque.lista', empresa_id=empresa.id) }}">← Voltar ao estoque</a>
+      <h1>{% if produto %}Editar produto{% else %}Novo produto{% endif %}</h1>
+      <p>{% if produto %}Alterações ficam registradas na auditoria.{% else %}O produto começará com saldo zero, aguardando inventário.{% endif %}</p>
+    </div>
+  </section>
+
+  <section class="form-panel">
+    <form method="post" class="form-grid" novalidate>
+      {{ form.hidden_tag() }}
+      <div class="field span-2">
+        {{ form.nome.label }}{{ form.nome(placeholder='Ex.: Picanha premium') }}
+        {% for error in form.nome.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </div>
+      <div class="field">
+        {{ form.codigo_externo.label }}{{ form.codigo_externo(placeholder='Opcional') }}
+        <small>Códigos repetidos são permitidos, mas ficam sinalizados.</small>
+        {% for error in form.codigo_externo.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </div>
+      <div class="field">
+        {{ form.categoria.label }}{{ form.categoria(placeholder='Ex.: Carnes bovinas') }}
+        {% for error in form.categoria.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </div>
+      <div class="field">
+        {{ form.unidade.label }}{{ form.unidade() }}
+        {% for error in form.unidade.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </div>
+      <div class="field">
+        {{ form.preco_venda.label }}{{ form.preco_venda(inputmode='decimal', placeholder='0,00') }}
+        {% for error in form.preco_venda.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </div>
+
+      {% if mgv6_ativo %}
+        <div class="field span-2">
+          {{ form.mgv6_codigo_item.label }}
+          {{ form.mgv6_codigo_item(inputmode='numeric', maxlength='6', autocomplete='off', placeholder='Ex.: 27') }}
+          <small>
+            Código mestre do item em <strong>MGV6 → Consulta → Item</strong>. Não use o PLU expandido da etiqueta.
+            Ex.: PRIME STEAK usa item MGV6 <strong>27</strong>, embora a etiqueta contenha 002700.
+          </small>
+          {% for error in form.mgv6_codigo_item.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+        </div>
+      {% endif %}
+
+      <label class="check-field">{{ form.pesado() }}<span>{{ form.pesado.label.text }}<small>Use para itens calculados em KG.</small></span></label>
+      <label class="check-field">{{ form.revisao_pendente() }}<span>{{ form.revisao_pendente.label.text }}<small>Mostra um alerta até a conferência.</small></span></label>
+      <div class="form-actions span-2">
+        <a class="button button-secondary" href="{{ url_for('estoque.lista', empresa_id=empresa.id) }}">Cancelar</a>
+        {{ form.submit(class='button button-primary') }}
+      </div>
+    </form>
+  </section>
+
+  {% if produto and mgv6_ativo %}
+    <section class="panel">
+      <div class="section-heading">
+        <h2>Preço na Toledo MGV6 / Prix</h2>
+        <p>
+          O Big Jhow usa a API oficial do MGV6. A palavra-chave fica somente no ambiente do servidor e nunca é exibida aqui.
+          Após uma alteração de preço, etiquetas deste produto ficam bloqueadas até a conferência física da Prix.
+        </p>
+        {% if not mgv6_escrita %}
+          <div class="notice">
+            <strong>Modo somente leitura.</strong> Validação e consultas estão liberadas, mas alterações de preço não serão enviadas ao MGV6 até <span class="code">MGV6_WRITE_ENABLED=true</span>.
+          </div>
+        {% endif %}
+      </div>
+
+      {% if produto.mgv6 %}
+        <div class="table-scroll">
+          <table>
+            <tbody>
+              <tr><th>Item MGV6</th><td><strong class="code">{{ produto.mgv6.codigo_item }}</strong></td></tr>
+              <tr><th>Status</th><td><span class="badge badge-{{ produto.mgv6.status_badge }}">{{ produto.mgv6.status_rotulo }}</span></td></tr>
+              <tr><th>Descrição confirmada</th><td>{{ produto.mgv6.descricao_mgv or '—' }}</td></tr>
+              <tr><th>Preço no Big Jhow</th><td>R$ {{ '%.2f'|format(produto.preco_venda)|replace('.', ',') }}</td></tr>
+              <tr><th>Preço confirmado no MGV6</th><td>{% if produto.mgv6.preco_mgv is not none %}R$ {{ '%.2f'|format(produto.mgv6.preco_mgv)|replace('.', ',') }}{% else %}—{% endif %}</td></tr>
+              <tr><th>Última importação</th><td>{{ produto.mgv6.numero_importacao or '—' }}</td></tr>
+              <tr><th>Último retorno</th><td>{{ produto.mgv6.ultima_mensagem or 'Ainda não validado.' }}</td></tr>
+              <tr><th>Última tentativa</th><td>{{ produto.mgv6.ultima_tentativa_em|data_hora if produto.mgv6.ultima_tentativa_em else '—' }}</td></tr>
+              <tr><th>Prix conferida</th><td>{{ produto.mgv6.balanca_confirmada_em|data_hora if produto.mgv6.balanca_confirmada_em else 'Não' }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="form-actions mgv-actions">
+          <form method="post" action="{{ url_for('estoque.mgv6_validar', empresa_id=empresa.id, produto_id=produto.id) }}">
+            {{ mgv_acao_form.csrf_token(id='csrf_mgv_validar') }}
+            <button class="button button-secondary" type="submit">Validar item no MGV6</button>
+          </form>
+          {% if mgv6_escrita %}
+            <form method="post" action="{{ url_for('estoque.mgv6_sincronizar', empresa_id=empresa.id, produto_id=produto.id) }}">
+              {{ mgv_acao_form.csrf_token(id='csrf_mgv_sincronizar') }}
+              <button class="button button-primary" type="submit">Reenviar preço ao MGV6</button>
+            </form>
+          {% else %}
+            <button class="button button-primary" type="button" disabled title="Escrita MGV6 desativada no ambiente">Reenviar preço ao MGV6</button>
+          {% endif %}
+          {% if produto.mgv6.status in ['validado', 'aguardando_balanca'] and produto.mgv6.preco_mgv == produto.preco_venda %}
+            <form method="post" action="{{ url_for('estoque.mgv6_confirmar_balanca', empresa_id=empresa.id, produto_id=produto.id) }}">
+              {{ mgv_acao_form.csrf_token(id='csrf_mgv_confirmar') }}
+              <button class="button button-secondary" type="submit">Confirmei o preço na Prix</button>
+            </form>
+          {% endif %}
+        </div>
+
+        {% if produto.mgv6.status in ['validado', 'aguardando_balanca'] and produto.mgv6.preco_mgv == produto.preco_venda %}
+          <div class="notice">
+            <strong>Não confirme no escuro.</strong> Só use “Confirmei o preço na Prix” depois de selecionar este item fisicamente na balança e verificar que o preço/kg exibido é igual ao Big Jhow.
+          </div>
+        {% endif %}
+      {% else %}
+        <div class="notice">
+          Este produto ainda não está vinculado ao MGV6. Informe o código mestre acima e salve o produto.
+          Para produtos vendidos por peso, o Big Jhow não permite alterar preço sem esse vínculo enquanto a integração estiver ativa.
+        </div>
+      {% endif %}
+    </section>
+  {% endif %}
+{% endblock %}

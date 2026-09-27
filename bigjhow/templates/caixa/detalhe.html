@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Venda #{{ venda.numero_formatado }}{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <div>
+      <a class="back-link" href="{{ url_for('operacao.historico', empresa_id=empresa.id) }}">← Voltar ao histórico</a>
+      <span class="eyebrow">{{ empresa.nome|upper }} / REGISTRO DE VENDA</span>
+      <h1>Venda #{{ venda.numero_formatado }}</h1>
+      <p>Operação preservada para consulta e auditoria.</p>
+    </div>
+    <div class="header-actions">
+      <span class="badge {{ 'badge-success' if venda.status == 'finalizada' else 'badge-danger' }} status-caixa">{{ venda.status_rotulo }}</span>
+      {% if venda.status in ['finalizada', 'cancelada'] %}<a class="button button-secondary" href="{{ url_for('caixa.ticket', empresa_id=empresa.id, venda_id=venda.id) }}">Abrir ticket</a>{% endif %}
+    </div>
+  </section>
+
+  <section class="metric-grid caixa-metricas">
+    <article class="metric-card"><span>Total</span><strong>{{ venda.total|brl }}</strong><small>valor registrado</small></article>
+    <article class="metric-card"><span>Itens</span><strong>{{ venda.itens|length }}</strong><small>produtos distintos</small></article>
+    <article class="metric-card"><span>Operador</span><strong class="metric-text">{{ venda.operador.nome if venda.operador else 'Usuário removido' }}</strong><small>{{ venda.finalizado_em|data_hora }}</small></article>
+    <article class="metric-card muted"><span>Troco</span><strong>{{ venda.troco|brl }}</strong><small>somente dinheiro</small></article>
+  </section>
+
+  {% if venda.status == 'cancelada' %}
+    <div class="flash flash-erro"><strong>Venda cancelada.</strong> {{ venda.motivo_cancelamento }} · {{ venda.cancelado_em|data_hora }}</div>
+  {% endif %}
+
+  <section class="panel venda-detail-panel">
+    <div class="section-heading"><div><span class="eyebrow">ITENS REGISTRADOS</span><h2>Produtos</h2></div></div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Produto</th><th>Código</th><th>Quantidade</th><th class="number">Preço</th><th class="number">Subtotal</th></tr></thead>
+        <tbody>{% for item in venda.itens %}<tr><td><strong>{{ item.produto_nome }}</strong><small class="subline">{{ item.sku_interno }} · {{ item.unidade }}</small></td><td><span class="code">{{ item.codigo_lido }}</span></td><td>{{ item.quantidade|quantidade }}</td><td class="number">{{ item.preco_unitario|brl }}</td><td class="number"><strong>{{ item.subtotal|brl }}</strong></td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel venda-payments-panel">
+    <div class="section-heading"><div><span class="eyebrow">PAGAMENTOS</span><h2>Composição do recebimento</h2></div></div>
+    <div class="payment-summary-list">
+      {% for pagamento in venda.pagamentos %}
+        <div><span>{{ pagamento.metodo_rotulo }}</span><strong>{{ pagamento.valor|brl }}</strong>{% if pagamento.metodo == 'dinheiro' and pagamento.valor_recebido != pagamento.valor %}<small>Recebido: {{ pagamento.valor_recebido|brl }}</small>{% endif %}</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% if cancelar_form %}
+    <section class="panel cancel-final-sale-panel">
+      <span class="eyebrow">AÇÃO ADMINISTRATIVA</span>
+      <h2>Cancelar venda finalizada</h2>
+      <p>O cancelamento devolve todos os itens ao estoque na mesma transação e permanece auditado.</p>
+      <form method="post" action="{{ url_for('caixa.cancelar', empresa_id=empresa.id, venda_id=venda.id) }}" class="form-stack" data-confirm="Cancelar esta venda e devolver todos os itens ao estoque?">
+        {{ cancelar_form.hidden_tag() }}
+        <div class="field">{{ cancelar_form.motivo.label }}{{ cancelar_form.motivo(rows=4, maxlength=500) }}{% for error in cancelar_form.motivo.errors %}<small class="field-error">{{ error }}</small>{% endfor %}</div>
+        <div class="form-actions">{{ cancelar_form.submit(class='button button-danger') }}</div>
+      </form>
+    </section>
+  {% endif %}
+{% endblock %}

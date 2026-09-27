@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Alterar senha{% endblock %}
+{% block content %}
+  <section class="page-header compact">
+    <div>
+      <span class="eyebrow">SEGURANÇA DA CONTA</span>
+      <h1>{% if obrigatoria %}Crie sua senha definitiva{% else %}Alterar senha{% endif %}</h1>
+      <p>
+        {% if obrigatoria %}
+          A senha recebida é temporária. Troque-a antes de acessar o sistema.
+        {% else %}
+          A alteração encerrará todas as outras sessões da sua conta.
+        {% endif %}
+      </p>
+    </div>
+  </section>
+
+  <section class="form-panel form-panel-narrow">
+    <form method="post" class="form-stack" novalidate>
+      {{ form.hidden_tag() }}
+      <div class="field">
+        {{ form.senha_atual.label }}
+        {{ form.senha_atual(autocomplete='current-password', autofocus=true) }}
+        {% for error in form.senha_atual.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </div>
+      <div class="field">
+        {{ form.nova_senha.label }}
+        {{ form.nova_senha(autocomplete='new-password', aria_describedby='regras-senha') }}
+        <small id="regras-senha">Mínimo de 12 caracteres, com maiúscula, minúscula, número e símbolo. Não use seu nome ou usuário.</small>
+        {% for error in form.nova_senha.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </div>
+      <div class="field">
+        {{ form.confirmar_senha.label }}
+        {{ form.confirmar_senha(autocomplete='new-password') }}
+        {% for error in form.confirmar_senha.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </div>
+      <div class="form-actions">
+        {% if not obrigatoria %}<a class="button button-secondary" href="{{ url_for('index') }}">Cancelar</a>{% endif %}
+        {{ form.submit(class='button button-primary') }}
+      </div>
+    </form>
+  </section>
+{% endblock %}
